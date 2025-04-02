@@ -7,35 +7,59 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  // Thêm state cho modal login
+const [showLoginModal, setShowLoginModal] = useState(false);
+
+// Hàm xử lý đăng nhập thành công
+const handleLoginSuccess = (token) => {
+  setIsLoggedIn(true);
+  // Gọi API lấy thông tin user
+  fetch('/user-info', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+    .then(res => res.json())
+    .then(data => setUserInfo(data));
+};
+
+// Render thêm LoginModal
+{showLoginModal && (
+  <LoginModal 
+    isOpen={showLoginModal}
+    onClose={() => setShowLoginModal(false)}
+    onLoginSuccess={handleLoginSuccess}
+  />
+)}
   // Nếu modal không mở, không hiển thị
   if (!isOpen) return null;
   
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+ // Trong hàm handleSubmit
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
+
+  try {
+    const response = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
     
-    try {
-      const result = await authService.login(email, password);
-      
-      if (result.success) {
-        // Đăng nhập thành công
-        setLoading(false);
-        if (onLoginSuccess) onLoginSuccess();
-        onClose();
-      } else {
-        // Đăng nhập thất bại
-        setError(result.error || 'Đăng nhập thất bại');
-        setLoading(false);
-      }
-    } catch (error) {
-      setError('Đã xảy ra lỗi khi đăng nhập');
-      setLoading(false);
-      console.error('Login error:', error);
+    const result = await response.json();
+    
+    if (result.data?.generateCustomerToken?.token) {
+      localStorage.setItem('authToken', result.data.generateCustomerToken.token);
+      onLoginSuccess(result.data.generateCustomerToken.token);
+      onClose();
+    } else {
+      setError(result.error || 'Đăng nhập thất bại');
     }
-  };
-  
+  } catch (error) {
+    setError('Lỗi kết nối server');
+  }
+  setLoading(false);
+};
+
   const handleGuestContinue = () => {
     // Đóng modal và tiếp tục dưới dạng khách
     onClose();

@@ -17,7 +17,6 @@ import ChatLayout from './components/ChatLayout';
 import ChatInput from './components/ChatInput';
 import UserProfile from './components/UserProfile';
 import LoginModal from './components/LoginModal';
-import Sidebar from './components/Sidebar';
 import '@chatui/core/dist/index.css';
 import './styles.css';
 
@@ -126,7 +125,7 @@ function App() {
     appendMsg({
       type: 'text',
       content: {
-        text: 'Xin chào! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
+        text: 'Xin chào! Tôi là trợ lý MM Mega Market. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
       },
     });
     
@@ -185,7 +184,7 @@ function App() {
     appendMsg({
       type: 'text',
       content: {
-        text: 'Xin chào! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
+        text: 'Xin chào! Tôi là trợ lý MM. Bạn cần hỗ trợ gì ạ?'
       },
     });
   };
