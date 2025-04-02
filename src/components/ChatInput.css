@@ -1,0 +1,102 @@
+.chat-input-container {
+    padding: 16px;
+    border-top: 1px solid #e9ecef;
+    background-color: white;
+  }
+  
+  .chat-input-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .input-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    background-color: #f8f9fa;
+    border-radius: 24px;
+    padding: 0 8px;
+    border: 1px solid #e9ecef;
+  }
+  
+  .file-upload-button {
+    background: none;
+    border: none;
+    color: #1976d2;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  
+  .hidden-file-input {
+    display: none;
+  }
+  
+  .chat-input {
+    flex: 1;
+    border: none;
+    padding: 12px;
+    font-size: 14px;
+    background-color: transparent;
+    outline: none;
+    width: 100%;
+  }
+  
+  .clear-button {
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .send-button {
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .send-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .send-button:not(:disabled):hover {
+    background-color: #1565c0;
+  }
+  
+  @media (max-width: 576px) {
+    .chat-input-container {
+      padding: 12px;
+    }
+    
+    .input-wrapper {
+      padding: 0 6px;
+    }
+    
+    .chat-input {
+      padding: 10px;
+      font-size: 13px;
+    }
+    
+    .send-button {
+      width: 36px;
+      height: 36px;
+    }
+  }
