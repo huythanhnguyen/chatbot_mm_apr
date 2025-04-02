@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@chatui/core": "^2.4.2",
+    "@google/generative-ai": "^0.2.0",
     "axios": "^1.8.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
