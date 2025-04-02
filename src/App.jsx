@@ -15,6 +15,9 @@ import ProductDetail from './components/ProductDetail';
 import CartView from './components/CartView';
 import ChatLayout from './components/ChatLayout';
 import ChatInput from './components/ChatInput';
+import UserProfile from './components/UserProfile';
+import LoginModal from './components/LoginModal';
+import Sidebar from './components/Sidebar';
 import '@chatui/core/dist/index.css';
 import './styles.css';
 
@@ -828,54 +831,86 @@ function App() {
 
   // Tùy chỉnh cách hiển thị nội dung tin nhắn
   const renderMessageContent = (msg) => {
-    const { content, type } = msg;
-    
-    // Xử lý các loại tin nhắn tùy chỉnh
-    if (type === 'custom') {
-      switch (content.type) {
-        case 'productList':
-          return (
-            <ProductListBubble 
-              products={content.products} 
-              onViewDetails={handleViewProductDetails}
-              onAddToCart={handleAddToCart}
-            />
-          );
+    // Kiểm tra msg và msg.content một cách kỹ lưỡng
+    if (!msg) {
+      return <Bubble content="Tin nhắn không tồn tại" />;
+    }
+  
+    const { type, content } = msg;
+  
+    // Kiểm tra type và content
+    if (!type) {
+      return <Bubble content="Loại tin nhắn không xác định" />;
+    }
+  
+    if (!content) {
+      return (
+        <div className="loading-container">
+          <div className="spinner">
+            <div className="bounce1"></div>
+            <div className="bounce2"></div>
+            <div className="bounce3"></div>
+          </div>
+        </div>
+      );
+    }
+  
+    // Xử lý các loại tin nhắn
+    switch (type) {
+      case 'text':
+        // Kiểm tra nội dung văn bản
+        if (!content.text) {
+          return <Bubble content="Tin nhắn văn bản trống" />;
+        }
         
-        case 'productDetail':
-          return (
-            <ProductDetailBubble 
-              product={content.product}
-              onAddToCart={handleAddToCart}
-              onBack={handleBackToProductList}
-            />
-          );
+        // Kiểm tra nếu nội dung có chứa Markdown
+        if (content.text && (
+          content.text.includes('**') || 
+          content.text.includes('##') || 
+          content.text.includes('```')
+        )) {
+          return <MarkdownBubble content={content.text} />;
+        }
         
-        case 'cartView':
-          return (
-            <CartViewBubble 
-              cartData={content.cartData}
-              onClose={handleCloseCart}
-              onCheckout={handleCheckout}
-            />
-          );
+        return <Bubble content={content.text} />;
+  
+      case 'custom':
+        // Xử lý tin nhắn tùy chỉnh
+        switch (content.type) {
+          case 'productList':
+            return (
+              <ProductListBubble 
+                products={content.products || []} 
+                onViewDetails={handleViewProductDetails}
+                onAddToCart={handleAddToCart}
+              />
+            );
           
-        default:
-          return <Bubble content={content.text} />;
-      }
+          case 'productDetail':
+            return (
+              <ProductDetailBubble 
+                product={content.product || {}}
+                onAddToCart={handleAddToCart}
+                onBack={handleBackToProductList}
+              />
+            );
+          
+          case 'cartView':
+            return (
+              <CartViewBubble 
+                cartData={content.cartData || {}}
+                onClose={handleCloseCart}
+                onCheckout={handleCheckout}
+              />
+            );
+            
+          default:
+            return <Bubble content="Loại tin nhắn tùy chỉnh không xác định" />;
+        }
+  
+      default:
+        return <Bubble content="Loại tin nhắn không được hỗ trợ" />;
     }
-    
-    // Kiểm tra nếu nội dung có chứa Markdown
-    if (content.text && (
-      content.text.includes('**') || 
-      content.text.includes('##') || 
-      content.text.includes('```')
-    )) {
-      return <MarkdownBubble content={content.text} />;
-    }
-    
-    // Nếu không, hiển thị bong bóng chat thông thường
-    return <Bubble content={content.text} />;
   };
 
   // Reset tin nhắn để load chat mới
@@ -910,14 +945,14 @@ function App() {
             </div>
           ))}
           
-          {/* Typing indicator */}
-          {false && (
-            <div className="typing-indicator">
-              <div className="dot"></div>
-              <div className="dot"></div>
-              <div className="dot"></div>
-            </div>
-          )}
+         {/* Typing indicator */}
+        {isTyping && (
+          <div className="typing-indicator active">
+            <div className="dot"></div>
+            <div className="dot"></div>
+            <div className="dot"></div>
+          </div>
+        )}
         </div>
         
         <ChatInput 
