@@ -1,6 +1,7 @@
 import axios from 'axios';
+import AuthService from './auth-service';
 
-// Thay thế dòng khai báo BASE_URL
+// Lấy API URL từ biến môi trường của Vite
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://ai-agent-backend-18ql.onrender.com';
 
 class BackendService {
@@ -29,8 +30,13 @@ class BackendService {
   // Tạo giỏ hàng
   async createCart(customerToken = null) {
     try {
+      const headers = customerToken ? 
+        { 'Authorization': `Bearer ${customerToken}` } : {};
+        
       const response = await axios.post(`${BASE_URL}/cart/create`, 
-        { customer_token: customerToken });
+        { customer_token: customerToken },
+        { headers }
+      );
       return response.data;
     } catch (error) {
       console.error('Error creating cart:', error);
@@ -40,15 +46,15 @@ class BackendService {
 
   // Thêm sản phẩm vào giỏ hàng
   async addToCart(cartId, sku, quantity = 1, authToken = null) {
-    const config = {};
+    const headers = {};
     if (authToken) {
-      config.headers = { 'Authorization': `Bearer ${authToken}` };
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     
     try {
       const response = await axios.post(`${BASE_URL}/cart/add`, 
         { cart_id: cartId, sku, quantity },
-        config
+        { headers }
       );
       return response.data;
     } catch (error) {
@@ -59,13 +65,13 @@ class BackendService {
 
   // Lấy thông tin giỏ hàng
   async getCart(cartId, authToken = null) {
-    const config = {};
+    const headers = {};
     if (authToken) {
-      config.headers = { 'Authorization': `Bearer ${authToken}` };
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     
     try {
-      const response = await axios.get(`${BASE_URL}/cart/${cartId}`, config);
+      const response = await axios.get(`${BASE_URL}/cart/${cartId}`, { headers });
       return response.data;
     } catch (error) {
       console.error('Error getting cart:', error);
@@ -76,7 +82,18 @@ class BackendService {
   // Bắt đầu thanh toán
   async startCheckout(cartId) {
     try {
-      const response = await axios.post(`${BASE_URL}/checkout/start`, { cart_id: cartId });
+      // Thêm token xác thực nếu đã đăng nhập
+      const headers = {};
+      const authToken = AuthService.getToken();
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      
+      const response = await axios.post(
+        `${BASE_URL}/checkout/start`, 
+        { cart_id: cartId },
+        { headers }
+      );
       return response.data;
     } catch (error) {
       console.error('Error starting checkout:', error);

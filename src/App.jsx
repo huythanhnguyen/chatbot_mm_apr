@@ -3,6 +3,9 @@ import Chat, { Bubble, useMessages } from '@chatui/core';
 import ReactMarkdown from 'react-markdown';
 import BackendService from './services/backend-service';
 import GeminiService from './services/gemini-service';
+import AuthService from './services/auth-service';
+import LoginModal from './components/LoginModal';
+import UserProfile from './components/UserProfile';
 import {
   formatProductResults,
   formatProductDetails,
@@ -29,6 +32,17 @@ function App() {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [cartId, setCartId] = useState(null);
   const [debugMode, setDebugMode] = useState(false);
+  
+  // State cho chức năng xác thực
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [user, setUser] = useState(null);
+
+  // Kiểm tra trạng thái đăng nhập khi component mount
+  useEffect(() => {
+    if (AuthService.isAuthenticated()) {
+      setUser(AuthService.getCurrentUser());
+    }
+  }, []);
 
   // Kiểm tra kết nối API khi ứng dụng khởi động
   useEffect(() => {
@@ -66,16 +80,23 @@ function App() {
     appendMsg({
       type: 'text',
       content: {
-        text: 'Xin chào! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
+        text: user 
+          ? `Xin chào ${user.email}! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?`
+          : 'Xin chào! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
       },
     });
-  }, []);
+  }, [user]);
 
   // Khởi tạo giỏ hàng
   const initCart = async () => {
     try {
       console.log('Khởi tạo giỏ hàng...');
-      const response = await BackendService.createCart();
+      // Nếu đã đăng nhập, tạo giỏ hàng có xác thực
+      const token = AuthService.getToken();
+      const response = token
+        ? await BackendService.createCart(token)
+        : await BackendService.createCart();
+      
       console.log('Phản hồi khởi tạo giỏ hàng:', response);
       
       if (response.cart_id) {
@@ -150,6 +171,40 @@ function App() {
         }
         return;
       }
+      
+      // Lệnh đăng nhập
+      if (val === "/login") {
+        if (user) {
+          appendMsg({
+            type: 'text',
+            content: { text: `Bạn đã đăng nhập với tài khoản ${user.email}` },
+          });
+        } else {
+          appendMsg({
+            type: 'text',
+            content: { text: `Đang mở form đăng nhập...` },
+          });
+          setShowLoginModal(true);
+        }
+        return;
+      }
+      
+      // Lệnh đăng xuất
+      if (val === "/logout") {
+        if (user) {
+          handleLogout();
+          appendMsg({
+            type: 'text',
+            content: { text: `Đã đăng xuất thành công` },
+          });
+        } else {
+          appendMsg({
+            type: 'text',
+            content: { text: `Bạn chưa đăng nhập` },
+          });
+        }
+        return;
+      }
 
       // Hiển thị tin nhắn của người dùng
       appendMsg({
@@ -220,7 +275,8 @@ function App() {
 
             try {
               const quantity = intent.quantity || 1;
-              const addToCartResponse = await BackendService.addToCart(cartId, intent.sku, quantity);
+              const authToken = AuthService.getToken();
+              const addToCartResponse = await BackendService.addToCart(cartId, intent.sku, quantity, authToken);
               responseText = formatAddToCartResponse(addToCartResponse);
             } catch (error) {
               console.error('Lỗi khi thêm vào giỏ hàng:', error);
@@ -237,7 +293,8 @@ function App() {
             }
 
             try {
-              const cartData = await BackendService.getCart(cartId);
+              const authToken = AuthService.getToken();
+              const cartData = await BackendService.getCart(cartId, authToken);
               responseText = formatCartResponse(cartData);
             } catch (error) {
               console.error('Lỗi khi xem giỏ hàng:', error);
@@ -253,8 +310,15 @@ function App() {
               break;
             }
 
+            // Kiểm tra đăng nhập
+            if (!user) {
+              responseText = 'Bạn cần đăng nhập để thực hiện thanh toán. Hãy nhập "/login" để đăng nhập.';
+              break;
+            }
+
             try {
-              const cartInfo = await BackendService.getCart(cartId);
+              const authToken = AuthService.getToken();
+              const cartInfo = await BackendService.getCart(cartId, authToken);
               if (!cartInfo.data || !cartInfo.data.cart || !cartInfo.data.cart.items || cartInfo.data.cart.items.length === 0) {
                 responseText = 'Giỏ hàng của bạn hiện đang trống, không thể thanh toán.';
                 break;
@@ -328,6 +392,40 @@ function App() {
     return <Bubble content={content.text} />;
   };
 
+  // Xử lý đăng nhập thành công
+  const handleLoginSuccess = () => {
+    // Cập nhật thông tin người dùng
+    setUser(AuthService.getCurrentUser());
+    
+    // Khởi tạo giỏ hàng mới với token xác thực
+    initCart();
+    
+    // Thêm tin nhắn chào mừng đã đăng nhập
+    appendMsg({
+      type: 'text',
+      content: {
+        text: `Chào mừng ${AuthService.getCurrentUser().email} đã đăng nhập! Tôi có thể giúp gì cho bạn?`
+      },
+    });
+  };
+
+  // Xử lý đăng xuất
+  const handleLogout = () => {
+    AuthService.logout();
+    setUser(null);
+    
+    // Khởi tạo lại giỏ hàng dưới dạng khách
+    initCart();
+    
+    // Thêm tin nhắn thông báo đăng xuất
+    appendMsg({
+      type: 'text',
+      content: {
+        text: 'Bạn đã đăng xuất. Một số chức năng có thể bị hạn chế. Nếu muốn đăng nhập lại, hãy nhập "/login".'
+      },
+    });
+  };
+
   // Quick replies - các phản hồi nhanh
   const defaultQuickReplies = [
     {
@@ -348,28 +446,42 @@ function App() {
       isNew: false,
     },
     {
-      name: '/test-api',
+      name: user ? '/logout' : '/login',
       isNew: false,
-    },
+    }
   ];
 
   return (
-    <div className="chatbot-container">
-      <Chat
-        navbar={{
-          title: debugMode ? 'MM Vietnam Shop (Debug Mode)' : 'MM Vietnam Shop',
-        }}
-        messages={messages}
-        renderMessageContent={renderMessageContent}
-        quickReplies={defaultQuickReplies}
-        onQuickReplyClick={(item) => handleSend('text', item.name)}
-        onSend={handleSend}
-        locale="vi-VN"
-        placeholder="Nhập tin nhắn của bạn..."
-        loadMoreText="Tải thêm"
-        commentsText="tin nhắn"
+    <>
+      <div className="chatbot-container">
+        <div className="chat-header">
+          {user && <UserProfile user={user} onLogout={handleLogout} />}
+          <h2>{debugMode ? 'MM Vietnam Shop (Debug Mode)' : 'MM Vietnam Shop'}</h2>
+        </div>
+        
+        <Chat
+          navbar={{
+            title: debugMode ? 'MM Vietnam Shop (Debug Mode)' : 'MM Vietnam Shop',
+          }}
+          messages={messages}
+          renderMessageContent={renderMessageContent}
+          quickReplies={defaultQuickReplies}
+          onQuickReplyClick={(item) => handleSend('text', item.name)}
+          onSend={handleSend}
+          locale="vi-VN"
+          placeholder="Nhập tin nhắn của bạn..."
+          loadMoreText="Tải thêm"
+          commentsText="tin nhắn"
+        />
+      </div>
+      
+      {/* Modal đăng nhập */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+        onLoginSuccess={handleLoginSuccess} 
       />
-    </div>
+    </>
   );
 }
 

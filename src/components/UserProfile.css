@@ -1,0 +1,47 @@
+.user-profile {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    background-color: rgba(74, 108, 247, 0.1);
+    border-radius: 20px;
+    margin-right: 10px;
+  }
+  
+  .user-info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .user-email {
+    font-size: 0.9rem;
+    color: #4a6cf7;
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .logout-button {
+    background: none;
+    border: none;
+    color: #718096;
+    margin-left: 8px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  
+  .logout-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #e53e3e;
+  }
+  
+  @media (max-width: 768px) {
+    .user-email {
+      max-width: 100px;
+    }
+  }
