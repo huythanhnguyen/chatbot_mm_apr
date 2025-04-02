@@ -73,6 +73,7 @@ function App() {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [cartId, setCartId] = useState(null);
   const [debugMode, setDebugMode] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchResults, setSearchResults] = useState(null);
   const [cartData, setCartData] = useState(null);
@@ -910,7 +911,7 @@ function App() {
           ))}
           
           {/* Typing indicator */}
-          {typing && (
+          {false && (
             <div className="typing-indicator">
               <div className="dot"></div>
               <div className="dot"></div>
