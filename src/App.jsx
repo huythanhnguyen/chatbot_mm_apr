@@ -1,11 +1,9 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
 import Chat, { Bubble, useMessages } from '@chatui/core';
 import ReactMarkdown from 'react-markdown';
 import BackendService from './services/backend-service';
 import GeminiService from './services/gemini-service';
-import AuthService from './services/auth-service';
-import LoginModal from './components/LoginModal';
-import UserProfile from './components/UserProfile';
 import {
   formatProductResults,
   formatProductDetails,
@@ -13,6 +11,9 @@ import {
   formatCartResponse,
   formatCheckoutResponse
 } from './utils/formatters';
+import ProductList from './components/ProductList';
+import ProductDetail from './components/ProductDetail';
+import CartView from './components/CartView';
 import '@chatui/core/dist/index.css';
 import './styles.css';
 
@@ -27,22 +28,55 @@ const MarkdownBubble = ({ content }) => {
   );
 };
 
+// Component hiển thị danh sách sản phẩm trong chat
+const ProductListBubble = ({ products, onViewDetails, onAddToCart }) => {
+  return (
+    <Bubble>
+      <ProductList 
+        products={products} 
+        onViewDetails={onViewDetails} 
+        onAddToCart={onAddToCart} 
+      />
+    </Bubble>
+  );
+};
+
+// Component hiển thị chi tiết sản phẩm trong chat
+const ProductDetailBubble = ({ product, onAddToCart, onBack }) => {
+  return (
+    <Bubble>
+      <ProductDetail 
+        product={product} 
+        onAddToCart={onAddToCart} 
+        onBack={onBack} 
+      />
+    </Bubble>
+  );
+};
+
+// Component hiển thị giỏ hàng trong chat
+const CartViewBubble = ({ cartData, onClose, onCheckout }) => {
+  return (
+    <Bubble>
+      <CartView 
+        cartData={cartData} 
+        onClose={onClose} 
+        onCheckout={onCheckout} 
+      />
+    </Bubble>
+  );
+};
+
 function App() {
   const { messages, appendMsg, setTyping } = useMessages([]);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [cartId, setCartId] = useState(null);
   const [debugMode, setDebugMode] = useState(false);
-  
-  // State cho chức năng xác thực
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [user, setUser] = useState(null);
-
-  // Kiểm tra trạng thái đăng nhập khi component mount
-  useEffect(() => {
-    if (AuthService.isAuthenticated()) {
-      setUser(AuthService.getCurrentUser());
-    }
-  }, []);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [searchResults, setSearchResults] = useState(null);
+  const [cartData, setCartData] = useState(null);
+  const [showingProductDetail, setShowingProductDetail] = useState(false);
+  const [showingCart, setShowingCart] = useState(false);
 
   // Kiểm tra kết nối API khi ứng dụng khởi động
   useEffect(() => {
@@ -80,23 +114,16 @@ function App() {
     appendMsg({
       type: 'text',
       content: {
-        text: user 
-          ? `Xin chào ${user.email}! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?`
-          : 'Xin chào! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
+        text: 'Xin chào! Tôi là trợ lý ảo MM Shop. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
       },
     });
-  }, [user]);
+  }, []);
 
   // Khởi tạo giỏ hàng
   const initCart = async () => {
     try {
       console.log('Khởi tạo giỏ hàng...');
-      // Nếu đã đăng nhập, tạo giỏ hàng có xác thực
-      const token = AuthService.getToken();
-      const response = token
-        ? await BackendService.createCart(token)
-        : await BackendService.createCart();
-      
+      const response = await BackendService.createCart();
       console.log('Phản hồi khởi tạo giỏ hàng:', response);
       
       if (response.cart_id) {
@@ -171,40 +198,10 @@ function App() {
         }
         return;
       }
-      
-      // Lệnh đăng nhập
-      if (val === "/login") {
-        if (user) {
-          appendMsg({
-            type: 'text',
-            content: { text: `Bạn đã đăng nhập với tài khoản ${user.email}` },
-          });
-        } else {
-          appendMsg({
-            type: 'text',
-            content: { text: `Đang mở form đăng nhập...` },
-          });
-          setShowLoginModal(true);
-        }
-        return;
-      }
-      
-      // Lệnh đăng xuất
-      if (val === "/logout") {
-        if (user) {
-          handleLogout();
-          appendMsg({
-            type: 'text',
-            content: { text: `Đã đăng xuất thành công` },
-          });
-        } else {
-          appendMsg({
-            type: 'text',
-            content: { text: `Bạn chưa đăng nhập` },
-          });
-        }
-        return;
-      }
+
+      // Reset trạng thái hiển thị sản phẩm và giỏ hàng
+      setShowingProductDetail(false);
+      setShowingCart(false);
 
       // Hiển thị tin nhắn của người dùng
       appendMsg({
@@ -234,37 +231,97 @@ function App() {
         const intent = await GeminiService.determineUserIntent(val);
         console.log('Ý định người dùng:', intent);
 
-        let responseText = '';
-
         // Xử lý theo ý định
         switch (intent.intent) {
           case 'search_product':
             try {
               const searchResults = await BackendService.searchProducts(intent.keyword || val);
-              responseText = formatProductResults(searchResults);
+              
+              if (searchResults.data?.products?.items?.length > 0) {
+                setSearchResults(searchResults.data.products.items);
+                
+                // Hiển thị kết quả sản phẩm dạng danh sách có thể click
+                appendMsg({
+                  type: 'custom',
+                  content: {
+                    type: 'productList',
+                    products: searchResults.data.products.items,
+                  },
+                });
+                
+                // Thêm tin nhắn văn bản
+                appendMsg({
+                  type: 'text',
+                  content: { 
+                    text: `Tôi đã tìm thấy ${searchResults.data.products.items.length} sản phẩm cho "${intent.keyword || val}". Bạn có thể nhấp vào sản phẩm để xem chi tiết.`
+                  },
+                });
+              } else {
+                // Không tìm thấy sản phẩm
+                appendMsg({
+                  type: 'text',
+                  content: { 
+                    text: `Tôi không tìm thấy sản phẩm nào phù hợp với "${intent.keyword || val}". Bạn có thể thử tìm kiếm với từ khóa khác.`
+                  },
+                });
+              }
             } catch (error) {
               console.error('Lỗi khi tìm kiếm sản phẩm:', error);
-              responseText = debugMode 
-                ? `Lỗi tìm kiếm sản phẩm: ${error.message}` 
-                : "Xin lỗi, tôi không thể tìm kiếm sản phẩm lúc này.";
+              appendMsg({
+                type: 'text',
+                content: { 
+                  text: debugMode 
+                    ? `Lỗi tìm kiếm sản phẩm: ${error.message}` 
+                    : "Xin lỗi, tôi không thể tìm kiếm sản phẩm lúc này."
+                },
+              });
             }
             break;
 
           case 'product_details':
             try {
               const productDetails = await BackendService.getProductDetails(intent.sku);
-              responseText = formatProductDetails(productDetails);
+              
+              if (productDetails.data?.products?.items?.length > 0) {
+                const product = productDetails.data.products.items[0];
+                setSelectedProduct(product);
+                setShowingProductDetail(true);
+                
+                // Hiển thị chi tiết sản phẩm dạng có thể tương tác
+                appendMsg({
+                  type: 'custom',
+                  content: {
+                    type: 'productDetail',
+                    product: product,
+                  },
+                });
+              } else {
+                appendMsg({
+                  type: 'text',
+                  content: { 
+                    text: `Tôi không tìm thấy thông tin cho sản phẩm với mã SKU: ${intent.sku}.`
+                  },
+                });
+              }
             } catch (error) {
               console.error('Lỗi khi lấy chi tiết sản phẩm:', error);
-              responseText = debugMode 
-                ? `Lỗi lấy chi tiết sản phẩm: ${error.message}` 
-                : "Xin lỗi, tôi không thể lấy thông tin sản phẩm lúc này.";
+              appendMsg({
+                type: 'text',
+                content: { 
+                  text: debugMode 
+                    ? `Lỗi lấy chi tiết sản phẩm: ${error.message}` 
+                    : "Xin lỗi, tôi không thể lấy thông tin sản phẩm lúc này."
+                },
+              });
             }
             break;
 
           case 'add_to_cart':
             if (!intent.sku) {
-              responseText = 'Vui lòng cung cấp mã SKU của sản phẩm bạn muốn thêm vào giỏ hàng.';
+              appendMsg({
+                type: 'text', 
+                content: { text: 'Vui lòng cung cấp mã SKU của sản phẩm bạn muốn thêm vào giỏ hàng.' }
+              });
               break;
             }
 
@@ -275,79 +332,48 @@ function App() {
 
             try {
               const quantity = intent.quantity || 1;
-              const authToken = AuthService.getToken();
-              const addToCartResponse = await BackendService.addToCart(cartId, intent.sku, quantity, authToken);
-              responseText = formatAddToCartResponse(addToCartResponse);
+              const addToCartResponse = await BackendService.addToCart(cartId, intent.sku, quantity);
+              
+              // Hiển thị thông báo thêm vào giỏ hàng thành công
+              appendMsg({
+                type: 'text',
+                content: { text: formatAddToCartResponse(addToCartResponse) },
+              });
+              
+              // Tự động hiển thị giỏ hàng sau khi thêm sản phẩm
+              handleViewCart();
             } catch (error) {
               console.error('Lỗi khi thêm vào giỏ hàng:', error);
-              responseText = debugMode 
-                ? `Lỗi thêm vào giỏ hàng: ${error.message}` 
-                : "Xin lỗi, tôi không thể thêm sản phẩm vào giỏ hàng lúc này.";
+              appendMsg({
+                type: 'text',
+                content: { 
+                  text: debugMode 
+                    ? `Lỗi thêm vào giỏ hàng: ${error.message}` 
+                    : "Xin lỗi, tôi không thể thêm sản phẩm vào giỏ hàng lúc này."
+                },
+              });
             }
             break;
 
           case 'view_cart':
-            if (!cartId) {
-              responseText = 'Giỏ hàng của bạn hiện đang trống.';
-              break;
-            }
-
-            try {
-              const authToken = AuthService.getToken();
-              const cartData = await BackendService.getCart(cartId, authToken);
-              responseText = formatCartResponse(cartData);
-            } catch (error) {
-              console.error('Lỗi khi xem giỏ hàng:', error);
-              responseText = debugMode 
-                ? `Lỗi xem giỏ hàng: ${error.message}` 
-                : "Xin lỗi, tôi không thể hiển thị giỏ hàng lúc này.";
-            }
+            handleViewCart();
             break;
 
           case 'checkout':
-            if (!cartId) {
-              responseText = 'Giỏ hàng của bạn hiện đang trống, không thể thanh toán.';
-              break;
-            }
-
-            // Kiểm tra đăng nhập
-            if (!user) {
-              responseText = 'Bạn cần đăng nhập để thực hiện thanh toán. Hãy nhập "/login" để đăng nhập.';
-              break;
-            }
-
-            try {
-              const authToken = AuthService.getToken();
-              const cartInfo = await BackendService.getCart(cartId, authToken);
-              if (!cartInfo.data || !cartInfo.data.cart || !cartInfo.data.cart.items || cartInfo.data.cart.items.length === 0) {
-                responseText = 'Giỏ hàng của bạn hiện đang trống, không thể thanh toán.';
-                break;
-              }
-
-              const checkoutResponse = await BackendService.startCheckout(cartId);
-              responseText = formatCheckoutResponse(checkoutResponse);
-            } catch (error) {
-              console.error('Lỗi khi thanh toán:', error);
-              responseText = debugMode 
-                ? `Lỗi thanh toán: ${error.message}` 
-                : "Xin lỗi, tôi không thể xử lý thanh toán lúc này.";
-            }
+            handleCheckout();
             break;
 
           default:
             // Sử dụng phản hồi đã chuẩn bị từ trước
-            responseText = fallbackResponse || 'Xin lỗi, tôi không hiểu yêu cầu của bạn. Bạn có thể nói rõ hơn được không?';
+            appendMsg({
+              type: 'text',
+              content: { text: fallbackResponse || 'Xin lỗi, tôi không hiểu yêu cầu của bạn. Bạn có thể nói rõ hơn được không?' },
+            });
             break;
         }
 
-        // Cập nhật lịch sử hội thoại
-        setConversationHistory([...updatedHistory, { role: 'assistant', content: responseText }]);
-
-        // Hiển thị phản hồi từ bot
-        appendMsg({
-          type: 'text',
-          content: { text: responseText },
-        });
+        // Cập nhật lịch sử hội thoại với phản hồi
+        // (Đã xử lý riêng trong mỗi case để có phản hồi chính xác)
 
       } catch (error) {
         console.error('Lỗi xử lý tin nhắn:', error);
@@ -375,9 +401,234 @@ function App() {
     }
   };
 
+  // Hàm xử lý xem chi tiết sản phẩm
+  const handleViewProductDetails = async (sku) => {
+    setTyping(true);
+    
+    try {
+      const productDetails = await BackendService.getProductDetails(sku);
+      
+      if (productDetails.data?.products?.items?.length > 0) {
+        const product = productDetails.data.products.items[0];
+        setSelectedProduct(product);
+        setShowingProductDetail(true);
+        
+        // Hiển thị chi tiết sản phẩm dạng có thể tương tác
+        appendMsg({
+          type: 'custom',
+          content: {
+            type: 'productDetail',
+            product: product,
+          },
+        });
+      } else {
+        appendMsg({
+          type: 'text',
+          content: { 
+            text: `Tôi không tìm thấy thông tin cho sản phẩm với mã SKU: ${sku}.`
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi khi lấy chi tiết sản phẩm:', error);
+      appendMsg({
+        type: 'text',
+        content: { 
+          text: debugMode 
+            ? `Lỗi lấy chi tiết sản phẩm: ${error.message}` 
+            : "Xin lỗi, tôi không thể lấy thông tin sản phẩm lúc này."
+        },
+      });
+    } finally {
+      setTyping(false);
+    }
+  };
+
+  // Hàm xử lý thêm sản phẩm vào giỏ hàng
+  const handleAddToCart = async (sku, quantity) => {
+    setTyping(true);
+    
+    // Kiểm tra giỏ hàng
+    if (!cartId) {
+      await initCart();
+    }
+    
+    try {
+      const addToCartResponse = await BackendService.addToCart(cartId, sku, quantity);
+      
+      appendMsg({
+        type: 'text',
+        content: { text: formatAddToCartResponse(addToCartResponse) },
+      });
+      
+      // Không hiển thị giỏ hàng tự động ở đây để tránh gián đoạn trải nghiệm
+    } catch (error) {
+      console.error('Lỗi khi thêm vào giỏ hàng:', error);
+      appendMsg({
+        type: 'text',
+        content: { 
+          text: debugMode 
+            ? `Lỗi thêm vào giỏ hàng: ${error.message}` 
+            : "Xin lỗi, tôi không thể thêm sản phẩm vào giỏ hàng lúc này."
+        },
+      });
+    } finally {
+      setTyping(false);
+    }
+  };
+
+  // Hàm xử lý xem giỏ hàng
+  const handleViewCart = async () => {
+    setTyping(true);
+    
+    if (!cartId) {
+      appendMsg({
+        type: 'text',
+        content: { text: 'Giỏ hàng của bạn hiện đang trống.' },
+      });
+      setTyping(false);
+      return;
+    }
+
+    try {
+      const cartData = await BackendService.getCart(cartId);
+      setCartData(cartData);
+      
+      if (!cartData.data?.cart?.items || cartData.data.cart.items.length === 0) {
+        appendMsg({
+          type: 'text',
+          content: { text: 'Giỏ hàng của bạn hiện đang trống.' },
+        });
+      } else {
+        setShowingCart(true);
+        
+        // Hiển thị giỏ hàng dạng có thể tương tác
+        appendMsg({
+          type: 'custom',
+          content: {
+            type: 'cartView',
+            cartData: cartData,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi khi xem giỏ hàng:', error);
+      appendMsg({
+        type: 'text',
+        content: { 
+          text: debugMode 
+            ? `Lỗi xem giỏ hàng: ${error.message}` 
+            : "Xin lỗi, tôi không thể hiển thị giỏ hàng lúc này."
+        },
+      });
+    } finally {
+      setTyping(false);
+    }
+  };
+
+  // Hàm xử lý thanh toán
+  const handleCheckout = async () => {
+    setTyping(true);
+    
+    if (!cartId) {
+      appendMsg({
+        type: 'text',
+        content: { text: 'Giỏ hàng của bạn hiện đang trống, không thể thanh toán.' },
+      });
+      setTyping(false);
+      return;
+    }
+
+    try {
+      const cartInfo = await BackendService.getCart(cartId);
+      
+      if (!cartInfo.data?.cart?.items || cartInfo.data.cart.items.length === 0) {
+        appendMsg({
+          type: 'text',
+          content: { text: 'Giỏ hàng của bạn hiện đang trống, không thể thanh toán.' },
+        });
+      } else {
+        const checkoutResponse = await BackendService.startCheckout(cartId);
+        
+        appendMsg({
+          type: 'text',
+          content: { text: formatCheckoutResponse(checkoutResponse) },
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi khi thanh toán:', error);
+      appendMsg({
+        type: 'text',
+        content: { 
+          text: debugMode 
+            ? `Lỗi thanh toán: ${error.message}` 
+            : "Xin lỗi, tôi không thể xử lý thanh toán lúc này."
+        },
+      });
+    } finally {
+      setTyping(false);
+    }
+  };
+
+  // Quay lại danh sách sản phẩm từ chi tiết sản phẩm
+  const handleBackToProductList = () => {
+    setShowingProductDetail(false);
+    
+    if (searchResults && searchResults.length > 0) {
+      // Hiển thị lại danh sách sản phẩm
+      appendMsg({
+        type: 'custom',
+        content: {
+          type: 'productList',
+          products: searchResults,
+        },
+      });
+    }
+  };
+
+  // Đóng giỏ hàng
+  const handleCloseCart = () => {
+    setShowingCart(false);
+  };
+
   // Tùy chỉnh cách hiển thị nội dung tin nhắn
   const renderMessageContent = (msg) => {
-    const { content } = msg;
+    const { content, type } = msg;
+    
+    // Xử lý các loại tin nhắn tùy chỉnh
+    if (type === 'custom') {
+      switch (content.type) {
+        case 'productList':
+          return (
+            <ProductListBubble 
+              products={content.products} 
+              onViewDetails={handleViewProductDetails}
+              onAddToCart={handleAddToCart}
+            />
+          );
+        
+        case 'productDetail':
+          return (
+            <ProductDetailBubble 
+              product={content.product}
+              onAddToCart={handleAddToCart}
+              onBack={handleBackToProductList}
+            />
+          );
+        
+        case 'cartView':
+          return (
+            <CartViewBubble 
+              cartData={content.cartData}
+              onClose={handleCloseCart}
+              onCheckout={handleCheckout}
+            />
+          );
+          
+        default:
+          return <Bubble content={content.text} />;
+      }
+    }
     
     // Kiểm tra nếu nội dung có chứa Markdown
     if (content.text && (
@@ -390,40 +641,6 @@ function App() {
     
     // Nếu không, hiển thị bong bóng chat thông thường
     return <Bubble content={content.text} />;
-  };
-
-  // Xử lý đăng nhập thành công
-  const handleLoginSuccess = () => {
-    // Cập nhật thông tin người dùng
-    setUser(AuthService.getCurrentUser());
-    
-    // Khởi tạo giỏ hàng mới với token xác thực
-    initCart();
-    
-    // Thêm tin nhắn chào mừng đã đăng nhập
-    appendMsg({
-      type: 'text',
-      content: {
-        text: `Chào mừng ${AuthService.getCurrentUser().email} đã đăng nhập! Tôi có thể giúp gì cho bạn?`
-      },
-    });
-  };
-
-  // Xử lý đăng xuất
-  const handleLogout = () => {
-    AuthService.logout();
-    setUser(null);
-    
-    // Khởi tạo lại giỏ hàng dưới dạng khách
-    initCart();
-    
-    // Thêm tin nhắn thông báo đăng xuất
-    appendMsg({
-      type: 'text',
-      content: {
-        text: 'Bạn đã đăng xuất. Một số chức năng có thể bị hạn chế. Nếu muốn đăng nhập lại, hãy nhập "/login".'
-      },
-    });
   };
 
   // Quick replies - các phản hồi nhanh
@@ -446,42 +663,28 @@ function App() {
       isNew: false,
     },
     {
-      name: user ? '/logout' : '/login',
+      name: '/test-api',
       isNew: false,
-    }
+    },
   ];
 
   return (
-    <>
-      <div className="chatbot-container">
-        <div className="chat-header">
-          {user && <UserProfile user={user} onLogout={handleLogout} />}
-          <h2>{debugMode ? 'MM Vietnam Shop (Debug Mode)' : 'MM Vietnam Shop'}</h2>
-        </div>
-        
-        <Chat
-          navbar={{
-            title: debugMode ? 'MM Vietnam Shop (Debug Mode)' : 'MM Vietnam Shop',
-          }}
-          messages={messages}
-          renderMessageContent={renderMessageContent}
-          quickReplies={defaultQuickReplies}
-          onQuickReplyClick={(item) => handleSend('text', item.name)}
-          onSend={handleSend}
-          locale="vi-VN"
-          placeholder="Nhập tin nhắn của bạn..."
-          loadMoreText="Tải thêm"
-          commentsText="tin nhắn"
-        />
-      </div>
-      
-      {/* Modal đăng nhập */}
-      <LoginModal 
-        isOpen={showLoginModal} 
-        onClose={() => setShowLoginModal(false)} 
-        onLoginSuccess={handleLoginSuccess} 
+    <div className="chatbot-container">
+      <Chat
+        navbar={{
+          title: debugMode ? 'MM Vietnam Shop (Debug Mode)' : 'MM Vietnam Shop',
+        }}
+        messages={messages}
+        renderMessageContent={renderMessageContent}
+        quickReplies={defaultQuickReplies}
+        onQuickReplyClick={(item) => handleSend('text', item.name)}
+        onSend={handleSend}
+        locale="vi-VN"
+        placeholder="Nhập tin nhắn của bạn..."
+        loadMoreText="Tải thêm"
+        commentsText="tin nhắn"
       />
-    </>
+    </div>
   );
 }
 
