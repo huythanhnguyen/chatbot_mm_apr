@@ -10,8 +10,21 @@ const ProductDetail = ({ product, onAddToCart, onBack }) => {
   }
   
   const { name, sku, description, price_range, small_image, unit_ecom } = product;
-  const finalPrice = price_range?.maximum_price?.final_price;
-  const discount = price_range?.maximum_price?.discount;
+  
+  // Kiểm tra giá một cách an toàn
+  const hasValidPrice = price_range && 
+                       price_range.maximum_price && 
+                       price_range.maximum_price.final_price;
+                       
+  const finalPrice = hasValidPrice ? price_range.maximum_price.final_price : null;
+  const discount = hasValidPrice && price_range.maximum_price.discount ? 
+                   price_range.maximum_price.discount : null;
+  
+  // Kiểm tra giá gốc an toàn
+  const hasRegularPrice = product.price && 
+                         product.price.regularPrice && 
+                         product.price.regularPrice.amount;
+  const regularPrice = hasRegularPrice ? product.price.regularPrice.amount : null;
   
   const handleAddToCart = () => {
     if (onAddToCart) onAddToCart(sku, quantity);
@@ -65,6 +78,13 @@ const ProductDetail = ({ product, onAddToCart, onBack }) => {
           {finalPrice && (
             <div className="product-detail-price">
               <span className="final-price">{formatPrice(finalPrice.value)} {finalPrice.currency}</span>
+              
+              {discount && discount.percent_off > 0 && regularPrice && (
+                <div className="product-discount">
+                  <span className="original-price">{formatPrice(regularPrice.value)} {regularPrice.currency}</span>
+                  <span className="discount-percent">-{Math.round(discount.percent_off)}%</span>
+                </div>
+              )}
             </div>
           )}
           

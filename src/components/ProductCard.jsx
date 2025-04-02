@@ -1,4 +1,4 @@
-// src/components/ProductCard.jsx
+// src/components/ProductCard.jsx (corregido)
 import React from 'react';
 import './ProductCard.css';
 
@@ -19,8 +19,14 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
     return new Intl.NumberFormat('vi-VN').format(price);
   };
   
-  const finalPrice = price_range?.maximum_price?.final_price;
-  const discount = price_range?.maximum_price?.discount;
+  // Kiểm tra giá một cách an toàn
+  const hasValidPrice = price_range && 
+                       price_range.maximum_price && 
+                       price_range.maximum_price.final_price;
+                       
+  const finalPrice = hasValidPrice ? price_range.maximum_price.final_price : null;
+  const discount = hasValidPrice && price_range.maximum_price.discount ? 
+                   price_range.maximum_price.discount : null;
   
   return (
     <div className="product-card" onClick={handleViewDetails}>
@@ -42,6 +48,7 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
       <div className="product-info">
         <h3 className="product-name">{name}</h3>
         <p className="product-sku">SKU: {sku}</p>
+        
         {finalPrice && (
           <p className="product-price">{formatPrice(finalPrice.value)} {finalPrice.currency}</p>
         )}
