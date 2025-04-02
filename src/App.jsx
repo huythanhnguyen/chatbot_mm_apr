@@ -961,6 +961,9 @@ function App() {
       </div>
     </ChatLayout>
   );
+  // Trong src/main.jsx hoặc App.jsx, thêm logging
+console.log('Viewport width:', window.innerWidth);
+console.log('Device pixel ratio:', window.devicePixelRatio);
 }
 
 export default App;
