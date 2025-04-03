@@ -6,17 +6,17 @@ import authService from '../services/auth-service';
 const Sidebar = ({ 
   isOpen, 
   onClose, 
-  onLogin,
+  user, 
+  onLogin, 
   onLogout,
-  chatHistory = [],
+  chatHistory,
   onChatSelect,
   onNewChat,
-  wishlistItems = [],
+  currentChatId, // Thêm dòng này - thiếu prop này
+  wishlist = [],
   cartItems = [],
   onViewCart,
-  onViewWishlist,
-  onRemoveFromCart,
-  onUpdateCartQuantity
+  onViewWishlist
 }) => {
   const [activeTab, setActiveTab] = useState('chats');
   const sidebarRef = useRef(null);
@@ -63,8 +63,8 @@ const Sidebar = ({
     }, 0);
   };
 
-  // Render các tab khác nhau dựa trên activeTab
-  const renderTabContent = () => {
+   // Trong phần sử dụng currentChatId
+   const renderTabContent = () => {
     switch (activeTab) {
       case 'chats':
         return (
@@ -85,8 +85,8 @@ const Sidebar = ({
                   >
                     <i className="fas fa-comment"></i>
                     <div className="chat-history-info">
-                      <div className="chat-history-title">{chat.title || 'Trò chuyện mới'}</div>
-                      <div className="chat-history-date">{formatChatTime(chat.timestamp)}</div>
+                      <div className="chat-history-title">{chat.title || 'Trò chuyện không tiêu đề'}</div>
+                      <div className="chat-history-date">{new Date(chat.timestamp).toLocaleString()}</div>
                     </div>
                   </div>
                 ))
@@ -99,7 +99,7 @@ const Sidebar = ({
             </div>
           </div>
         );
-      
+
       case 'cart':
         return (
           <div className="sidebar-section">
