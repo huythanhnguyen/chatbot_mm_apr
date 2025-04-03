@@ -1,4 +1,6 @@
+// src/services/wishlist-service.js
 import axios from 'axios';
+import authService from './auth-service';
 
 // Hằng số cho localStorage
 const WISHLIST_STORAGE_KEY = 'mm_wishlist_items';
@@ -66,6 +68,12 @@ class WishlistService {
 
     this._wishlistItems.push(wishlistItem);
     this._saveToLocalStorage();
+    
+    // Nếu người dùng đã đăng nhập, đồng bộ với server
+    if (authService.isAuthenticated()) {
+      this.syncWithAccount(authService.getToken());
+    }
+    
     return true;
   }
 
@@ -78,6 +86,12 @@ class WishlistService {
 
     if (this._wishlistItems.length !== initialLength) {
       this._saveToLocalStorage();
+      
+      // Nếu người dùng đã đăng nhập, đồng bộ với server
+      if (authService.isAuthenticated()) {
+        this.syncWithAccount(authService.getToken());
+      }
+      
       return true;
     }
 
@@ -99,6 +113,11 @@ class WishlistService {
   clear() {
     this._wishlistItems = [];
     this._saveToLocalStorage();
+    
+    // Nếu người dùng đã đăng nhập, đồng bộ với server
+    if (authService.isAuthenticated()) {
+      this.syncWithAccount(authService.getToken());
+    }
   }
 
   // Lấy số lượng sản phẩm trong danh sách yêu thích
@@ -108,41 +127,39 @@ class WishlistService {
 
   // Đồng bộ danh sách yêu thích với tài khoản đã đăng nhập (API)
   async syncWithAccount(authToken) {
-    if (!authToken) return;
+    if (!authToken) return { success: false, error: 'Không có token xác thực' };
 
     try {
-      // Đây là nơi bạn sẽ gọi API để đồng bộ danh sách yêu thích
-      // với tài khoản đã đăng nhập
-
-      // Ví dụ:
-      // 1. Tải danh sách yêu thích từ server
-      // 2. Kết hợp với danh sách cục bộ
-      // 3. Lưu lại danh sách kết hợp
-
-      // Mô phỏng API call (sẽ thay thế bằng mã thực tế)
-      /*
-      const response = await axios.get('/api/wishlist', {
-        headers: {
-          Authorization: `Bearer ${authToken}`
+      // API endpoint
+      const apiUrl = import.meta.env.VITE_BACKEND_URL || 'https://ai-agent-backend-18ql.onrender.com';
+      
+      // Gửi danh sách yêu thích hiện tại lên server
+      const response = await axios.post(
+        `${apiUrl}/wishlist/sync`, 
+        { items: this._wishlistItems },
+        { headers: { 'Authorization': `Bearer ${authToken}` } }
+      );
+      
+      if (response.data && response.data.success) {
+        // Nếu server trả về danh sách đã đồng bộ, cập nhật danh sách local
+        if (response.data.wishlist) {
+          this._wishlistItems = response.data.wishlist;
+          this._saveToLocalStorage();
         }
-      });
-
-      // Kết hợp danh sách từ server với danh sách cục bộ
-      const serverItems = response.data.items || [];
-      const localItems = this._wishlistItems;
-
-      // Logic kết hợp hai danh sách
-      // ...
-
-      // Lưu lại kết quả
-      this._wishlistItems = combinedItems;
-      this._saveToLocalStorage();
-      */
-
-      return true;
+        
+        return { success: true };
+      }
+      
+      return { 
+        success: false, 
+        error: response.data?.error || 'Đồng bộ danh sách yêu thích thất bại' 
+      };
     } catch (error) {
       console.error('Error syncing wishlist with account:', error);
-      return false;
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Lỗi kết nối đến server' 
+      };
     }
   }
 }

@@ -17,6 +17,7 @@
   display: flex;
   align-items: center;
   gap: 3px;
+  z-index: 5;
 }
 
 .typing-dot {
@@ -249,8 +250,16 @@
   transition: background-color 0.2s;
 }
 
+.send-button.mm-blue {
+  background-color: #004d9f; /* MM dark blue color */
+}
+
 .send-button:hover:not(:disabled) {
   background-color: #1565c0;
+}
+
+.send-button.mm-blue:hover:not(:disabled) {
+  background-color: #003b7a; /* Darker MM blue for hover */
 }
 
 .send-button:disabled {
@@ -277,5 +286,33 @@
   .send-button {
     width: 38px;
     height: 38px;
+  }
+  
+  .chat-textarea {
+    padding: 8px 15px;
+    padding-right: 30px;
+    font-size: 0.9rem;
+  }
+}
+
+/* For very small screens */
+@media (max-width: 360px) {
+  .attachment-btn,
+  .voice-button {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .send-button {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .chat-form {
+    gap: 4px;
+  }
+  
+  .file-name {
+    max-width: 100px;
   }
 }

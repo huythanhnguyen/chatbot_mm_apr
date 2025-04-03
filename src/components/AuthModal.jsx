@@ -1,7 +1,9 @@
+// src/components/AuthModal.jsx
 import React, { useState } from 'react';
 import './AuthModal.css';
+import authService from '../services/auth-service';
 
-const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
+const AuthModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -9,6 +11,9 @@ const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Nếu modal không mở, không hiển thị
+  if (!isOpen) return null;
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -21,12 +26,21 @@ const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
     setLoading(true);
     
     try {
-      await onLogin(email, password);
-      setLoading(false);
-      // Nếu thành công, onLogin sẽ xử lý việc đóng modal
+      const result = await authService.login(email, password);
+      
+      if (result.success) {
+        if (onLoginSuccess) {
+          onLoginSuccess(result.token);
+        }
+        onClose();
+      } else {
+        setError(result.error || 'Đăng nhập không thành công. Vui lòng thử lại.');
+      }
     } catch (err) {
-      setLoading(false);
+      console.error('Login error:', err);
       setError(err.message || 'Đăng nhập không thành công. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,19 +60,45 @@ const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
     setLoading(true);
     
     try {
-      await onSignup(name, email, password);
-      setLoading(false);
-      // Nếu thành công, onSignup sẽ xử lý việc đóng modal
+      // Giả định rằng authService có phương thức register
+      // Nếu không, bạn có thể cần triển khai nó
+      const result = await authService.register(name, email, password);
+      
+      if (result.success) {
+        // Tự động đăng nhập sau khi đăng ký
+        const loginResult = await authService.login(email, password);
+        if (loginResult.success) {
+          if (onLoginSuccess) {
+            onLoginSuccess(loginResult.token);
+          }
+          onClose();
+        } else {
+          setError('Đăng ký thành công. Vui lòng đăng nhập.');
+          setActiveTab('login');
+        }
+      } else {
+        setError(result.error || 'Đăng ký không thành công. Vui lòng thử lại.');
+      }
     } catch (err) {
-      setLoading(false);
+      console.error('Signup error:', err);
       setError(err.message || 'Đăng ký không thành công. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
+  const handleGuestContinue = () => {
+    // Đóng modal và tiếp tục dưới dạng khách
+    onClose();
+  };
+  
   return (
-    <div className="auth-modal-overlay">
+    <div className="auth-modal-overlay" onClick={(e) => {
+      // Đóng modal khi click bên ngoài
+      if (e.target.classList.contains('auth-modal-overlay')) {
+        onClose();
+      }
+    }}>
       <div className="auth-modal">
         <div className="auth-modal-header">
           <h2>MM Vietnam Shop</h2>
@@ -206,13 +246,23 @@ const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
         )}
 
         <div className="auth-footer">
-          <p>Hoặc đăng nhập với</p>
+          <p>Hoặc tiếp tục với</p>
           <div className="social-login">
             <button className="social-btn facebook">
               <i className="fab fa-facebook-f"></i>
             </button>
             <button className="social-btn google">
               <i className="fab fa-google"></i>
+            </button>
+          </div>
+          
+          <div className="guest-login">
+            <button 
+              type="button" 
+              className="guest-btn"
+              onClick={handleGuestContinue}
+            >
+              Tiếp tục không cần đăng nhập
             </button>
           </div>
         </div>

@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+// src/components/ProductCard.jsx
+import React, { useState, useEffect } from 'react';
 import './ProductCard.css';
+import wishlistService from '../services/wishlist-service';
 
 const ProductCard = ({ 
   product, 
   onAddToCart, 
-  onViewDetails, 
-  onToggleWishlist,
-  isInWishlist = false
+  onViewDetails
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isInWishlist, setIsInWishlist] = useState(false);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
 
   const { 
@@ -19,6 +20,11 @@ const ProductCard = ({
     small_image 
   } = product;
 
+  // Kiểm tra sản phẩm có trong wishlist không
+  useEffect(() => {
+    setIsInWishlist(wishlistService.isInWishlist(sku));
+  }, [sku]);
+
   const handleAddToCart = async (e) => {
     e.stopPropagation();
     if (isAddingToCart) return;
@@ -26,6 +32,7 @@ const ProductCard = ({
     setIsAddingToCart(true);
     try {
       await onAddToCart(sku, quantity);
+      // Hiệu ứng thành công
       setTimeout(() => {
         setIsAddingToCart(false);
       }, 1000);
@@ -45,7 +52,8 @@ const ProductCard = ({
 
     setIsTogglingWishlist(true);
     try {
-      await onToggleWishlist(product);
+      const result = wishlistService.toggle(product);
+      setIsInWishlist(wishlistService.isInWishlist(sku));
       setTimeout(() => {
         setIsTogglingWishlist(false);
       }, 500);
@@ -104,7 +112,7 @@ const ProductCard = ({
           src={small_image?.url || '/placeholder-product.png'} 
           alt={name} 
           className="product-thumbnail"
-          onError={(e) => {e.target.src = '/placeholder-product.png'}}
+          onError={(e) => {e.target.src = 'https://via.placeholder.com/300x300?text=No+Image'}}
         />
       </div>
       
@@ -121,6 +129,7 @@ const ProductCard = ({
               className="quantity-btn" 
               onClick={decrementQuantity}
               disabled={quantity <= 1}
+              aria-label="Giảm số lượng"
             >
               -
             </button>
@@ -129,6 +138,7 @@ const ProductCard = ({
               className="quantity-btn" 
               onClick={incrementQuantity}
               disabled={quantity >= 99}
+              aria-label="Tăng số lượng"
             >
               +
             </button>
@@ -138,6 +148,7 @@ const ProductCard = ({
             className="add-to-cart-btn" 
             onClick={handleAddToCart}
             disabled={isAddingToCart}
+            aria-label="Thêm vào giỏ hàng"
           >
             {isAddingToCart ? (
               <i className="fas fa-spinner fa-spin"></i>

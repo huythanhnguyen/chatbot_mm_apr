@@ -1,3 +1,4 @@
+// src/services/chat-history-service.js
 // Hằng số cho localStorage
 const CHAT_HISTORY_STORAGE_KEY = 'mm_chat_history';
 const CURRENT_CHAT_ID_KEY = 'mm_current_chat_id';
@@ -78,12 +79,7 @@ class ChatHistoryService {
 
   // Lấy tất cả cuộc trò chuyện
   getAllChats() {
-    return this._chatHistory.map(chat => ({
-      id: chat.id,
-      title: chat.title,
-      timestamp: chat.timestamp,
-      messageCount: chat.messages.length
-    }));
+    return [...this._chatHistory];
   }
 
   // Lấy ID của cuộc trò chuyện hiện tại
@@ -115,7 +111,7 @@ class ChatHistoryService {
     if (!this._currentChatId) return [];
     
     const currentChat = this.getChatById(this._currentChatId);
-    return currentChat ? currentChat.messages : [];
+    return currentChat ? [...currentChat.messages] : [];
   }
 
   // Thêm tin nhắn vào cuộc trò chuyện hiện tại
@@ -142,9 +138,9 @@ class ChatHistoryService {
       
       // Cập nhật tiêu đề nếu đây là tin nhắn đầu tiên từ người dùng và cuộc trò chuyện chưa có tiêu đề cụ thể
       if (role === 'user' && 
-          this._chatHistory[currentChatIndex].messages.length === 1 &&
+          this._chatHistory[currentChatIndex].messages.filter(msg => msg.role === 'user').length === 1 &&
           this._chatHistory[currentChatIndex].title.startsWith('Trò chuyện ')) {
-        // Sử dụng 10 ký tự đầu tiên của tin nhắn làm tiêu đề
+        // Sử dụng 30 ký tự đầu tiên của tin nhắn làm tiêu đề
         let newTitle = content.substring(0, 30).trim();
         if (content.length > 30) newTitle += '...';
         this._chatHistory[currentChatIndex].title = newTitle;
@@ -206,14 +202,6 @@ class ChatHistoryService {
     }
     
     return false;
-  }
-
-  // Đồng bộ lịch sử chat với tài khoản đã đăng nhập (API)
-  async syncWithAccount(userId) {
-    // Phương thức này sẽ được triển khai khi có API
-    // Đồng bộ lịch sử chat giữa các thiết bị
-    console.log('Syncing chat history for user:', userId);
-    return true;
   }
 }
 

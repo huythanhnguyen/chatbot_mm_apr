@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
+// src/App.jsx
+import React, { useState, useEffect, useRef } from 'react';
 import Chat, { Bubble, useMessages } from '@chatui/core';
 import ReactMarkdown from 'react-markdown';
 import BackendService from './services/backend-service';
 import GeminiService from './services/gemini-service';
+import AuthService from './services/auth-service';
+import WishlistService from './services/wishlist-service';
+import ChatHistoryService from './services/chat-history-service';
 import {
   formatProductResults,
   formatProductDetails,
@@ -10,13 +14,16 @@ import {
   formatCartResponse,
   formatCheckoutResponse
 } from './utils/formatters';
+
+// Components
 import ProductList from './components/ProductList';
 import ProductDetail from './components/ProductDetail';
 import CartView from './components/CartView';
-import ChatLayout from './components/ChatLayout';
 import ChatInput from './components/ChatInput';
-import UserProfile from './components/UserProfile';
-import LoginModal from './components/LoginModal';
+import AuthModal from './components/AuthModal';
+import Sidebar from './components/Sidebar';
+
+// Styles
 import '@chatui/core/dist/index.css';
 import './styles.css';
 
@@ -74,6 +81,8 @@ function App() {
   const { messages, appendMsg, setTyping } = useMessages([]);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [cartId, setCartId] = useState(null);
+  const [cartItems, setCartItems] = useState([]);
+  const [wishlistItems, setWishlistItems] = useState([]);
   const [debugMode, setDebugMode] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -82,167 +91,248 @@ function App() {
   const [showingProductDetail, setShowingProductDetail] = useState(false);
   const [showingCart, setShowingCart] = useState(false);
   
-  // Các state mới cho sidebar và layout
+  // State cho sidebar và auth
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
+  
+  // State cho chat history
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userInfo, setUserInfo] = useState(null);
-  const [wishlistItems, setWishlistItems] = useState([]);
+  const messagesEndRef = useRef(null);
 
-  // Kiểm tra kết nối API khi ứng dụng khởi động
+  // Kiểm tra đăng nhập và tải dữ liệu ban đầu
   useEffect(() => {
-    async function testApiConnection() {
-      try {
-        const testResult = await GeminiService.testConnection();
-        console.log('Kết quả kiểm tra API:', testResult);
-        
-        if (!testResult.success) {
-          appendMsg({
-            type: 'text',
-            content: {
-              text: `⚠️ Cảnh báo: Kết nối API Gemini có vấn đề. Lỗi: ${testResult.error}`
-            },
-          });
-        }
-      } catch (error) {
-        console.error('Lỗi kiểm tra API:', error);
+    // Kiểm tra đăng nhập
+    const checkAuth = () => {
+      const isLoggedIn = AuthService.isAuthenticated();
+      setIsAuthenticated(isLoggedIn);
+      
+      if (isLoggedIn) {
+        const user = AuthService.getCurrentUser();
+        setUserInfo(user);
       }
-    }
+    };
     
+    // Tải danh sách yêu thích
+    const loadWishlist = () => {
+      const wishlist = WishlistService.getAll();
+      setWishlistItems(wishlist);
+    };
+    
+    // Tải lịch sử chat
+    const loadChatHistory = () => {
+      const history = ChatHistoryService.getAllChats();
+      setChatHistory(history);
+      
+      const currentId = ChatHistoryService.getCurrentChatId();
+      if (currentId) {
+        setCurrentChatId(currentId);
+        const messages = ChatHistoryService.getChatById(currentId)?.messages || [];
+        
+        // Khôi phục lịch sử trò chuyện
+        if (messages.length > 0) {
+          const userMessages = [];
+          
+          messages.forEach((msg) => {
+            appendMsg({
+              type: 'text',
+              content: { text: msg.content },
+              position: msg.role === 'user' ? 'right' : 'left',
+            });
+            
+            // Cập nhật lịch sử trò chuyện trong state
+            userMessages.push({ role: msg.role, content: msg.content });
+          });
+          
+          setConversationHistory(userMessages);
+        }
+      } else if (history.length > 0) {
+        setCurrentChatId(history[0].id);
+        ChatHistoryService.setCurrentChat(history[0].id);
+      } else {
+        // Tạo chat mới nếu không có lịch sử
+        handleNewChat();
+      }
+    };
+    
+    checkAuth();
+    loadWishlist();
+    loadChatHistory();
+    initCart();
+    
+    // Test API connection
     testApiConnection();
   }, []);
-
-  // Khởi tạo giỏ hàng khi component được tạo
+  
+  // Cuộn xuống dưới khi có tin nhắn mới
   useEffect(() => {
-    const storedCartId = localStorage.getItem('cartId');
-    if (storedCartId) {
-      setCartId(storedCartId);
-    } else {
-      initCart();
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-
-    // Thêm tin nhắn chào mừng
-    appendMsg({
-      type: 'text',
-      content: {
-        text: 'Xin chào! Tôi là trợ lý MM Mega Market. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
-      },
-    });
+  }, [messages]);
+  
+  // Cập nhật danh sách yêu thích khi có thay đổi
+  useEffect(() => {
+    const updateWishlist = () => {
+      const wishlist = WishlistService.getAll();
+      setWishlistItems(wishlist);
+    };
     
-    // Tạo chat ID mới nếu chưa có
-    if (!currentChatId) {
-      createNewChat();
-    }
+    // Thêm event listener cho localStorage changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'mm_wishlist_items') {
+        updateWishlist();
+      }
+    };
     
-    // Load lịch sử chat từ localStorage
-    loadChatHistory();
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
+
+  // Kiểm tra kết nối API
+  const testApiConnection = async () => {
+    try {
+      const testResult = await GeminiService.testConnection();
+      console.log('Kết quả kiểm tra API:', testResult);
+      
+      if (!testResult.success) {
+        appendMsg({
+          type: 'text',
+          content: {
+            text: `⚠️ Cảnh báo: Kết nối API Gemini có vấn đề. Lỗi: ${testResult.error}`
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi kiểm tra API:', error);
+    }
+  };
 
   // Khởi tạo giỏ hàng
   const initCart = async () => {
     try {
       console.log('Khởi tạo giỏ hàng...');
-      const response = await BackendService.createCart();
-      console.log('Phản hồi khởi tạo giỏ hàng:', response);
+      const storedCartId = localStorage.getItem('cartId');
       
-      if (response.cart_id) {
-        setCartId(response.cart_id);
-        localStorage.setItem('cartId', response.cart_id);
-        console.log('Đã tạo giỏ hàng mới:', response.cart_id);
+      if (storedCartId) {
+        setCartId(storedCartId);
+        // Tải thông tin giỏ hàng từ server
+        await loadCart(storedCartId);
       } else {
-        console.error('Không tìm thấy cart_id trong phản hồi');
+        const response = await BackendService.createCart();
+        console.log('Phản hồi khởi tạo giỏ hàng:', response);
+        
+        if (response.cart_id) {
+          setCartId(response.cart_id);
+          localStorage.setItem('cartId', response.cart_id);
+          console.log('Đã tạo giỏ hàng mới:', response.cart_id);
+        } else {
+          console.error('Không tìm thấy cart_id trong phản hồi');
+        }
       }
     } catch (error) {
       console.error('Lỗi khởi tạo giỏ hàng:', error);
     }
   };
   
+  // Tải thông tin giỏ hàng
+  const loadCart = async (cartId) => {
+    try {
+      const cartResponse = await BackendService.getCart(cartId);
+      setCartData(cartResponse);
+      
+      if (cartResponse?.data?.cart?.items) {
+        setCartItems(cartResponse.data.cart.items);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải giỏ hàng:', error);
+    }
+  };
+
+  // Xử lý đăng nhập thành công
+  const handleLoginSuccess = (token) => {
+    setIsAuthenticated(true);
+    const user = AuthService.getCurrentUser();
+    setUserInfo(user);
+    
+    // Đồng bộ wishlist và giỏ hàng
+    WishlistService.syncWithAccount(token);
+    
+    // Cập nhật danh sách yêu thích
+    setWishlistItems(WishlistService.getAll());
+    
+    // Đóng modal
+    setShowAuthModal(false);
+  };
+  
+  // Xử lý đăng xuất
+  const handleLogout = () => {
+    AuthService.logout();
+    setIsAuthenticated(false);
+    setUserInfo(null);
+  };
+  
   // Tạo chat mới
-  const createNewChat = () => {
-    const newChatId = `chat_${Date.now()}`;
-    
-    const newChat = {
-      id: newChatId,
-      title: "Cuộc trò chuyện mới",
-      messages: [],
-      timestamp: Date.now()
-    };
-    
-    setChatHistory(prevHistory => {
-      const updatedHistory = [newChat, ...prevHistory];
-      // Lưu lịch sử chat vào localStorage
-      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
-      return updatedHistory;
-    });
-    
-    // Reset các state hiện tại
+  const handleNewChat = () => {
+    // Tạo chat mới với ChatHistoryService
+    const newChatId = ChatHistoryService.createNewChat();
     setCurrentChatId(newChatId);
-    setConversationHistory([]);
-    setMessages([]);
     
-    // Thêm tin nhắn chào mừng cho chat mới
+    // Reset state
+    setConversationHistory([]);
+    
+    // Xóa tin nhắn cũ và hiển thị tin nhắn chào mừng mới
+    while (messages.length > 0) {
+      messages.pop();
+    }
+    
     appendMsg({
       type: 'text',
       content: {
-        text: 'Xin chào! Tôi là trợ lý MM. Bạn cần hỗ trợ gì ạ?'
+        text: 'Xin chào! Tôi là trợ lý MM Mega Market. Tôi có thể giúp bạn tìm kiếm sản phẩm, xem chi tiết và thêm vào giỏ hàng. Bạn cần hỗ trợ gì ạ?'
       },
     });
   };
-
-  // Load lịch sử chat từ localStorage
-  const loadChatHistory = () => {
-    try {
-      const savedHistory = localStorage.getItem('chatHistory');
-      if (savedHistory) {
-        const history = JSON.parse(savedHistory);
-        setChatHistory(history);
-        
-        // Nếu có lịch sử, chọn chat gần nhất
-        if (history.length > 0 && !currentChatId) {
-          setCurrentChatId(history[0].id);
-          
-          // Load tin nhắn từ chat đã chọn
-          if (history[0].messages && history[0].messages.length > 0) {
-            setConversationHistory(history[0].messages);
-            
-            // Hiển thị lại tin nhắn (optional, tùy theo cách quản lý tin nhắn)
-            // Đây là phần phức tạp vì cần phải xây dựng lại toàn bộ luồng chat
-            // có thể thực hiện hoặc bỏ qua tùy theo yêu cầu
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Lỗi khi tải lịch sử chat:', error);
-    }
-  };
-
-  // Chọn một chat từ lịch sử
-  const selectChat = (chatId) => {
+  
+  // Chọn chat từ lịch sử
+  const handleSelectChat = (chatId) => {
+    if (chatId === currentChatId) return;
+    
+    ChatHistoryService.setCurrentChat(chatId);
     setCurrentChatId(chatId);
     
-    // Load messages của chat đã chọn
-    const selectedChat = chatHistory.find(chat => chat.id === chatId);
-    if (selectedChat && selectedChat.messages) {
-      setConversationHistory(selectedChat.messages);
+    // Lấy tin nhắn từ chat đã chọn
+    const chat = ChatHistoryService.getChatById(chatId);
+    if (chat && chat.messages) {
+      // Xóa tin nhắn cũ
+      while (messages.length > 0) {
+        messages.pop();
+      }
       
-      // Reset tin nhắn hiện tại và hiển thị lại từ lịch sử
-      // Đây là phần phức tạp, có thể cần điều chỉnh tùy theo cách quản lý messages của @chatui/core
+      // Hiển thị lại tin nhắn từ lịch sử
+      const userMessages = [];
+      
+      chat.messages.forEach((msg) => {
+        appendMsg({
+          type: 'text',
+          content: { text: msg.content },
+          position: msg.role === 'user' ? 'right' : 'left',
+        });
+        
+        // Cập nhật lịch sử trò chuyện trong state
+        userMessages.push({ role: msg.role, content: msg.content });
+      });
+      
+      setConversationHistory(userMessages);
     }
   };
 
-  // Xử lý đăng nhập
-  const handleLogin = () => {
-    // Đây là phần giả định, cần thay thế bằng logic đăng nhập thực tế
-    setIsLoggedIn(true);
-    setUserInfo({
-      name: "Khách hàng",
-      email: "customer@example.com"
-    });
-    
-    // Có thể thêm logic load wishlist tại đây
-  };
-
-  // Hàm này thay thế cho handleSend trong App.jsx gốc
+  // Xử lý gửi tin nhắn
   const handleSendMessage = async (message) => {
     if (!message.trim()) {
       return;
@@ -257,54 +347,6 @@ function App() {
       });
       return;
     }
-    
-    if (message === "/test-api") {
-      appendMsg({
-        type: 'text',
-        content: { text: "Đang kiểm tra kết nối API Gemini..." },
-      });
-      
-      try {
-        const testResult = await GeminiService.testConnection();
-        appendMsg({
-          type: 'text',
-          content: { 
-            text: testResult.success 
-              ? "✅ API Gemini hoạt động bình thường!" 
-              : `❌ Lỗi kết nối API Gemini: ${testResult.error}` 
-          },
-        });
-      } catch (error) {
-        appendMsg({
-          type: 'text',
-          content: { text: `❌ Lỗi kiểm tra API: ${error.message}` },
-        });
-      }
-      return;
-    }
-    
-    if (message === "/test-backend") {
-      appendMsg({
-        type: 'text',
-        content: { text: "Đang kiểm tra kết nối backend..." },
-      });
-      
-      try {
-        const response = await BackendService.searchProducts("test");
-        appendMsg({
-          type: 'text',
-          content: { 
-            text: response ? "✅ Backend hoạt động bình thường!" : "❌ Backend không trả về dữ liệu"
-          },
-        });
-      } catch (error) {
-        appendMsg({
-          type: 'text',
-          content: { text: `❌ Lỗi kết nối backend: ${error.message}` },
-        });
-      }
-      return;
-    }
 
     // Reset trạng thái hiển thị sản phẩm và giỏ hàng
     setShowingProductDetail(false);
@@ -317,15 +359,19 @@ function App() {
       position: 'right',
     });
 
-    // Cập nhật lịch sử hội thoại
+    // Lưu tin nhắn vào lịch sử chat
+    ChatHistoryService.addMessage('user', message);
+    
+    // Cập nhật lịch sử trò chuyện cho Gemini
     const updatedHistory = [...conversationHistory, { role: 'user', content: message }];
     setConversationHistory(updatedHistory);
-    
-    // Lưu tin nhắn vào lịch sử chat
-    saveChatMessage(message, 'user');
+
+    // Cập nhật lịch sử chat trong state
+    setChatHistory(ChatHistoryService.getAllChats());
 
     // Hiển thị trạng thái đang nhập
     setTyping(true);
+    setIsTyping(true);
 
     // Thử xử lý phản hồi chung trước nếu các API khác bị lỗi
     let fallbackResponse = '';
@@ -360,15 +406,15 @@ function App() {
               });
               
               // Thêm tin nhắn văn bản
+              const responseText = `Tôi đã tìm thấy ${searchResults.data.products.items.length} sản phẩm cho "${intent.keyword || message}". Bạn có thể nhấp vào sản phẩm để xem chi tiết.`;
               appendMsg({
                 type: 'text',
-                content: { 
-                  text: `Tôi đã tìm thấy ${searchResults.data.products.items.length} sản phẩm cho "${intent.keyword || message}". Bạn có thể nhấp vào sản phẩm để xem chi tiết.`
-                },
+                content: { text: responseText },
               });
               
               // Lưu phản hồi vào lịch sử chat
-              saveChatMessage(`Tôi đã tìm thấy ${searchResults.data.products.items.length} sản phẩm cho "${intent.keyword || message}". Bạn có thể nhấp vào sản phẩm để xem chi tiết.`, 'assistant');
+              ChatHistoryService.addMessage('assistant', responseText);
+              setConversationHistory([...updatedHistory, { role: 'assistant', content: responseText }]);
             } else {
               // Không tìm thấy sản phẩm
               const noResultsMsg = `Tôi không tìm thấy sản phẩm nào phù hợp với "${intent.keyword || message}". Bạn có thể thử tìm kiếm với từ khóa khác.`;
@@ -378,7 +424,8 @@ function App() {
               });
               
               // Lưu phản hồi vào lịch sử chat
-              saveChatMessage(noResultsMsg, 'assistant');
+              ChatHistoryService.addMessage('assistant', noResultsMsg);
+              setConversationHistory([...updatedHistory, { role: 'assistant', content: noResultsMsg }]);
             }
           } catch (error) {
             console.error('Lỗi khi tìm kiếm sản phẩm:', error);
@@ -392,7 +439,8 @@ function App() {
             });
             
             // Lưu phản hồi vào lịch sử chat
-            saveChatMessage(errorMsg, 'assistant');
+            ChatHistoryService.addMessage('assistant', errorMsg);
+            setConversationHistory([...updatedHistory, { role: 'assistant', content: errorMsg }]);
           }
           break;
 
@@ -415,7 +463,9 @@ function App() {
               });
               
               // Lưu phản hồi vào lịch sử chat
-              saveChatMessage(`Chi tiết sản phẩm: ${product.name}`, 'assistant');
+              const responseText = `Chi tiết sản phẩm: ${product.name}`;
+              ChatHistoryService.addMessage('assistant', responseText);
+              setConversationHistory([...updatedHistory, { role: 'assistant', content: responseText }]);
             } else {
               const noProductMsg = `Tôi không tìm thấy thông tin cho sản phẩm với mã SKU: ${intent.sku}.`;
               appendMsg({
@@ -424,7 +474,8 @@ function App() {
               });
               
               // Lưu phản hồi vào lịch sử chat
-              saveChatMessage(noProductMsg, 'assistant');
+              ChatHistoryService.addMessage('assistant', noProductMsg);
+              setConversationHistory([...updatedHistory, { role: 'assistant', content: noProductMsg }]);
             }
           } catch (error) {
             console.error('Lỗi khi lấy chi tiết sản phẩm:', error);
@@ -438,7 +489,8 @@ function App() {
             });
             
             // Lưu phản hồi vào lịch sử chat
-            saveChatMessage(errorMsg, 'assistant');
+            ChatHistoryService.addMessage('assistant', errorMsg);
+            setConversationHistory([...updatedHistory, { role: 'assistant', content: errorMsg }]);
           }
           break;
 
@@ -451,7 +503,8 @@ function App() {
             });
             
             // Lưu phản hồi vào lịch sử chat
-            saveChatMessage(skuRequiredMsg, 'assistant');
+            ChatHistoryService.addMessage('assistant', skuRequiredMsg);
+            setConversationHistory([...updatedHistory, { role: 'assistant', content: skuRequiredMsg }]);
             break;
           }
 
@@ -472,7 +525,11 @@ function App() {
             });
             
             // Lưu phản hồi vào lịch sử chat
-            saveChatMessage(formattedResponse, 'assistant');
+            ChatHistoryService.addMessage('assistant', formattedResponse);
+            setConversationHistory([...updatedHistory, { role: 'assistant', content: formattedResponse }]);
+            
+            // Cập nhật lại giỏ hàng
+            await loadCart(cartId);
             
             // Tự động hiển thị giỏ hàng sau khi thêm sản phẩm
             handleViewCart();
@@ -488,7 +545,8 @@ function App() {
             });
             
             // Lưu phản hồi vào lịch sử chat
-            saveChatMessage(errorMsg, 'assistant');
+            ChatHistoryService.addMessage('assistant', errorMsg);
+            setConversationHistory([...updatedHistory, { role: 'assistant', content: errorMsg }]);
           }
           break;
 
@@ -509,7 +567,8 @@ function App() {
           });
           
           // Lưu phản hồi vào lịch sử chat
-          saveChatMessage(defaultResponse, 'assistant');
+          ChatHistoryService.addMessage('assistant', defaultResponse);
+          setConversationHistory([...updatedHistory, { role: 'assistant', content: defaultResponse }]);
           break;
       }
     } catch (error) {
@@ -533,70 +592,43 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(errorMessage, 'assistant');
+      ChatHistoryService.addMessage('assistant', errorMessage);
+      setConversationHistory([...updatedHistory, { role: 'assistant', content: errorMessage }]);
     } finally {
       // Tắt trạng thái đang nhập
       setTyping(false);
+      setIsTyping(false);
     }
   };
 
-  // Lưu tin nhắn vào lịch sử chat
-  const saveChatMessage = (message, role) => {
-    if (!currentChatId) return;
+  // Xử lý tải lên file
+  const handleFileUpload = (file) => {
+    if (!file) return;
     
-    setChatHistory(prevHistory => {
-      const updatedHistory = prevHistory.map(chat => {
-        if (chat.id === currentChatId) {
-          // Cập nhật tiêu đề chat dựa trên tin nhắn đầu tiên của người dùng
-          let updatedTitle = chat.title;
-          if (role === 'user' && (!chat.messages || chat.messages.length === 0)) {
-            updatedTitle = message.length > 30 ? message.substring(0, 30) + '...' : message;
-          }
-          
-          return {
-            ...chat,
-            title: updatedTitle,
-            messages: [...(chat.messages || []), { role, content: message }],
-            timestamp: Date.now()
-          };
-        }
-        return chat;
-      });
-      
-      // Lưu vào localStorage
-      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
-      return updatedHistory;
-    });
-  };
-
-  // Hàm xử lý tải lên file
-  const handleFileUpload = (files) => {
     // Hiển thị thông báo về file đã tải lên
     appendMsg({
       type: 'text',
-      content: { text: `Đã tải lên ${files.length} file.` },
+      content: { text: `Đã tải lên file: ${file.name} (${(file.size / 1024).toFixed(1)} KB)` },
       position: 'right',
     });
     
     // Lưu tin nhắn vào lịch sử chat
-    saveChatMessage(`Đã tải lên ${files.length} file.`, 'user');
-    
-    // Logic xử lý file
-    console.log('Files uploaded:', files);
+    ChatHistoryService.addMessage('user', `Đã tải lên file: ${file.name}`);
     
     // Để đơn giản, chỉ hiển thị thông báo đã nhận file
     appendMsg({
       type: 'text',
-      content: { text: `Tôi đã nhận được ${files.length} file. Bạn muốn tôi phân tích nội dung của các file này không?` },
+      content: { text: `Tôi đã nhận được file ${file.name}. Bạn muốn tôi phân tích nội dung của file này không?` },
     });
     
     // Lưu phản hồi vào lịch sử chat
-    saveChatMessage(`Tôi đã nhận được ${files.length} file. Bạn muốn tôi phân tích nội dung của các file này không?`, 'assistant');
+    ChatHistoryService.addMessage('assistant', `Tôi đã nhận được file ${file.name}. Bạn muốn tôi phân tích nội dung của file này không?`);
   };
 
-  // Hàm xử lý xem chi tiết sản phẩm
+  // Xử lý xem chi tiết sản phẩm
   const handleViewProductDetails = async (sku) => {
     setTyping(true);
+    setIsTyping(true);
     
     try {
       const productDetails = await BackendService.getProductDetails(sku);
@@ -616,7 +648,8 @@ function App() {
         });
         
         // Lưu thao tác này vào lịch sử chat
-        saveChatMessage(`Chi tiết sản phẩm: ${product.name}`, 'assistant');
+        const responseText = `Chi tiết sản phẩm: ${product.name}`;
+        ChatHistoryService.addMessage('assistant', responseText);
       } else {
         const noProductMsg = `Tôi không tìm thấy thông tin cho sản phẩm với mã SKU: ${sku}.`;
         appendMsg({
@@ -625,7 +658,7 @@ function App() {
         });
         
         // Lưu phản hồi vào lịch sử chat
-        saveChatMessage(noProductMsg, 'assistant');
+        ChatHistoryService.addMessage('assistant', noProductMsg);
       }
     } catch (error) {
       console.error('Lỗi khi lấy chi tiết sản phẩm:', error);
@@ -639,15 +672,17 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(errorMsg, 'assistant');
+      ChatHistoryService.addMessage('assistant', errorMsg);
     } finally {
       setTyping(false);
+      setIsTyping(false);
     }
   };
 
-  // Hàm xử lý thêm sản phẩm vào giỏ hàng
+  // Xử lý thêm sản phẩm vào giỏ hàng
   const handleAddToCart = async (sku, quantity) => {
     setTyping(true);
+    setIsTyping(true);
     
     // Kiểm tra giỏ hàng
     if (!cartId) {
@@ -664,7 +699,10 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(formattedResponse, 'assistant');
+      ChatHistoryService.addMessage('assistant', formattedResponse);
+      
+      // Cập nhật lại giỏ hàng
+      await loadCart(cartId);
     } catch (error) {
       console.error('Lỗi khi thêm vào giỏ hàng:', error);
       const errorMsg = debugMode 
@@ -677,15 +715,17 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(errorMsg, 'assistant');
+      ChatHistoryService.addMessage('assistant', errorMsg);
     } finally {
       setTyping(false);
+      setIsTyping(false);
     }
   };
 
-  // Hàm xử lý xem giỏ hàng
+  // Xử lý xem giỏ hàng
   const handleViewCart = async () => {
     setTyping(true);
+    setIsTyping(true);
     
     if (!cartId) {
       const emptyCartMsg = 'Giỏ hàng của bạn hiện đang trống.';
@@ -695,9 +735,10 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(emptyCartMsg, 'assistant');
+      ChatHistoryService.addMessage('assistant', emptyCartMsg);
       
       setTyping(false);
+      setIsTyping(false);
       return;
     }
 
@@ -713,8 +754,9 @@ function App() {
         });
         
         // Lưu phản hồi vào lịch sử chat
-        saveChatMessage(emptyCartMsg, 'assistant');
+        ChatHistoryService.addMessage('assistant', emptyCartMsg);
       } else {
+        setCartItems(cartData.data.cart.items);
         setShowingCart(true);
         
         // Hiển thị giỏ hàng dạng có thể tương tác
@@ -727,7 +769,7 @@ function App() {
         });
         
         // Lưu phản hồi vào lịch sử chat
-        saveChatMessage('Đây là giỏ hàng của bạn.', 'assistant');
+        ChatHistoryService.addMessage('assistant', 'Đây là giỏ hàng của bạn.');
       }
     } catch (error) {
       console.error('Lỗi khi xem giỏ hàng:', error);
@@ -741,15 +783,17 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(errorMsg, 'assistant');
+      ChatHistoryService.addMessage('assistant', errorMsg);
     } finally {
       setTyping(false);
+      setIsTyping(false);
     }
   };
 
-  // Hàm xử lý thanh toán
+  // Xử lý thanh toán
   const handleCheckout = async () => {
     setTyping(true);
+    setIsTyping(true);
     
     if (!cartId) {
       const emptyCartMsg = 'Giỏ hàng của bạn hiện đang trống, không thể thanh toán.';
@@ -759,9 +803,10 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(emptyCartMsg, 'assistant');
+      ChatHistoryService.addMessage('assistant', emptyCartMsg);
       
       setTyping(false);
+      setIsTyping(false);
       return;
     }
 
@@ -776,7 +821,7 @@ function App() {
         });
         
         // Lưu phản hồi vào lịch sử chat
-        saveChatMessage(emptyCartMsg, 'assistant');
+        ChatHistoryService.addMessage('assistant', emptyCartMsg);
       } else {
         const checkoutResponse = await BackendService.startCheckout(cartId);
         const formattedResponse = formatCheckoutResponse(checkoutResponse);
@@ -787,7 +832,7 @@ function App() {
         });
         
         // Lưu phản hồi vào lịch sử chat
-        saveChatMessage(formattedResponse, 'assistant');
+        ChatHistoryService.addMessage('assistant', formattedResponse);
       }
     } catch (error) {
       console.error('Lỗi khi thanh toán:', error);
@@ -801,9 +846,10 @@ function App() {
       });
       
       // Lưu phản hồi vào lịch sử chat
-      saveChatMessage(errorMsg, 'assistant');
+      ChatHistoryService.addMessage('assistant', errorMsg);
     } finally {
       setTyping(false);
+      setIsTyping(false);
     }
   };
 
@@ -826,6 +872,42 @@ function App() {
   // Đóng giỏ hàng
   const handleCloseCart = () => {
     setShowingCart(false);
+  };
+  
+  // Cập nhật số lượng sản phẩm trong giỏ hàng
+  const handleUpdateCartQuantity = async (itemId, quantity) => {
+    if (!cartId) return;
+    
+    try {
+      // Giả định BackendService có phương thức updateCartItem
+      await BackendService.updateCartItem(cartId, itemId, quantity);
+      
+      // Cập nhật lại giỏ hàng
+      await loadCart(cartId);
+    } catch (error) {
+      console.error('Lỗi khi cập nhật số lượng sản phẩm:', error);
+    }
+  };
+  
+  // Xóa sản phẩm khỏi giỏ hàng
+  const handleRemoveFromCart = async (itemId) => {
+    if (!cartId) return;
+    
+    try {
+      // Giả định BackendService có phương thức removeFromCart
+      await BackendService.removeFromCart(cartId, itemId);
+      
+      // Cập nhật lại giỏ hàng
+      await loadCart(cartId);
+    } catch (error) {
+      console.error('Lỗi khi xóa sản phẩm khỏi giỏ hàng:', error);
+    }
+  };
+  
+  // Toggle trạng thái yêu thích
+  const handleToggleWishlist = (product) => {
+    WishlistService.toggle(product);
+    setWishlistItems(WishlistService.getAll());
   };
 
   // Tùy chỉnh cách hiển thị nội dung tin nhắn
@@ -912,28 +994,110 @@ function App() {
     }
   };
 
-  // Reset tin nhắn để load chat mới
-  const setMessages = (newMessages) => {
-    // Không có phương thức trực tiếp để reset messages trong useMessages
-    // Nhưng có thể hiển thị lại nội dung từ đầu sau khi chọn chat mới
-  };
+  // Quick replies - các phản hồi nhanh
+  const defaultQuickReplies = [
+    {
+      name: '🔍 Tìm kiếm sản phẩm',
+      isNew: true,
+      isHighlight: true,
+    },
+    {
+      name: '🛒 Xem giỏ hàng',
+      isNew: false,
+    },
+    {
+      name: '💳 Thanh toán',
+      isNew: false,
+    },
+    {
+      name: '❓ Hỗ trợ',
+      isNew: false,
+    },
+  ];
 
   return (
-    <ChatLayout
-      onNewChat={createNewChat}
-      chatHistory={chatHistory}
-      onSelectChat={selectChat}
-      currentChatId={currentChatId}
-      onLogin={handleLogin}
-      isLoggedIn={isLoggedIn}
-      userInfo={userInfo}
-      wishlistItems={wishlistItems}
-    >
-      <div className="chat-content">
-        <div className="chat-header">
-          <h2>{debugMode ? 'MM Vietnam Shop (Debug Mode)' : 'MM Vietnam Shop'}</h2>
+    <div className="app-container">
+      {/* Sidebar */}
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)}
+        chatHistory={chatHistory}
+        onChatSelect={handleSelectChat}
+        onNewChat={handleNewChat}
+        wishlistItems={wishlistItems}
+        cartItems={cartItems}
+        onViewCart={handleViewCart}
+        onViewWishlist={() => console.log('View wishlist')}
+        onRemoveFromCart={handleRemoveFromCart}
+        onUpdateCartQuantity={handleUpdateCartQuantity}
+        onLogin={() => setShowAuthModal(true)}
+        onLogout={handleLogout}
+      />
+      
+      {/* Thanh tiêu đề */}
+      <div className="app-header">
+        <div className="header-left">
+          <button 
+            className="menu-button" 
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Mở menu chính"
+          >
+            <i className="fas fa-bars"></i>
+          </button>
+          <div className="logo-container">
+            <img 
+              src="/mega-market-logo.png" 
+              alt="MM Logo" 
+              className="logo"
+              onError={(e) => {e.target.src = 'https://via.placeholder.com/120x40?text=MM+Logo'}}
+            />
+          </div>
+          <h1 className="app-title">MM Mega Market</h1>
         </div>
         
+        <div className="header-right">
+          <button 
+            className="header-button wishlist-button"
+            onClick={() => console.log('View wishlist')}
+            aria-label="Xem danh sách yêu thích"
+          >
+            <i className="far fa-heart"></i>
+            {wishlistItems.length > 0 && <span className="badge">{wishlistItems.length}</span>}
+          </button>
+          
+          <button 
+            className="header-button cart-button"
+            onClick={handleViewCart}
+            aria-label="Xem giỏ hàng"
+          >
+            <i className="fas fa-shopping-cart"></i>
+            {cartItems.length > 0 && <span className="badge">{cartItems.length}</span>}
+          </button>
+          
+          {isAuthenticated ? (
+            <div className="user-profile-mini" onClick={() => setSidebarOpen(true)}>
+              <div className="user-avatar-mini">
+                {userInfo && userInfo.name ? userInfo.name.charAt(0).toUpperCase() : 
+                 userInfo && userInfo.email ? userInfo.email.charAt(0).toUpperCase() : 
+                 <i className="fas fa-user"></i>}
+              </div>
+              <span className="username-mini">{userInfo ? (userInfo.name || userInfo.email) : 'Người dùng'}</span>
+            </div>
+          ) : (
+            <button 
+              className="login-button-mini"
+              onClick={() => setShowAuthModal(true)}
+              aria-label="Đăng nhập"
+            >
+              <i className="fas fa-sign-in-alt"></i>
+              <span>Đăng nhập</span>
+            </button>
+          )}
+        </div>
+      </div>
+      
+      {/* Chat UI */}
+      <div className="chat-content">
         <div className="chat-messages">
           {messages.map((msg, index) => (
             <div 
@@ -944,26 +1108,49 @@ function App() {
             </div>
           ))}
           
-         {/* Typing indicator */}
-        {isTyping && (
-          <div className="typing-indicator active">
-            <div className="dot"></div>
-            <div className="dot"></div>
-            <div className="dot"></div>
-          </div>
-        )}
+          {/* Typing indicator */}
+          {isTyping && (
+            <div className="typing-indicator active">
+              <div className="dot"></div>
+              <div className="dot"></div>
+              <div className="dot"></div>
+            </div>
+          )}
+          
+          {/* Reference for scrolling to bottom */}
+          <div ref={messagesEndRef} />
         </div>
         
+        {/* Quick replies */}
+        <div className="quick-replies">
+          {defaultQuickReplies.map((item, index) => (
+            <button 
+              key={index}
+              className={`quick-reply-btn ${item.isHighlight ? 'highlight' : ''}`}
+              onClick={() => handleSendMessage(item.name)}
+              aria-label={`Gửi nhanh: ${item.name}`}
+            >
+              {item.name}
+            </button>
+          ))}
+        </div>
+        
+        {/* Chat input */}
         <ChatInput 
           onSendMessage={handleSendMessage}
           onFileUpload={handleFileUpload}
+          isTyping={isTyping}
         />
       </div>
-    </ChatLayout>
+      
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    </div>
   );
-  // Trong src/main.jsx hoặc App.jsx, thêm logging
-console.log('Viewport width:', window.innerWidth);
-console.log('Device pixel ratio:', window.devicePixelRatio);
 }
 
 export default App;

@@ -1,3 +1,4 @@
+// src/components/ChatInput.jsx
 import React, { useState, useRef } from 'react';
 import './ChatInput.css';
 
@@ -101,6 +102,7 @@ const ChatInput = ({ onSendMessage, onFileUpload, isTyping }) => {
           className="attachment-btn" 
           onClick={handleFileButtonClick}
           title="Đính kèm tệp"
+          aria-label="Đính kèm tệp"
         >
           <i className="fas fa-plus"></i>
         </button>
@@ -127,6 +129,7 @@ const ChatInput = ({ onSendMessage, onFileUpload, isTyping }) => {
               className="clear-button" 
               onClick={() => setMessage('')}
               title="Xóa nội dung"
+              aria-label="Xóa nội dung"
             >
               <i className="fas fa-times"></i>
             </button>
@@ -138,15 +141,17 @@ const ChatInput = ({ onSendMessage, onFileUpload, isTyping }) => {
           className={`voice-button ${isRecording ? 'recording' : ''}`}
           onClick={handleRecordToggle}
           title={isRecording ? "Dừng ghi âm" : "Bắt đầu ghi âm"}
+          aria-label={isRecording ? "Dừng ghi âm" : "Bắt đầu ghi âm"}
         >
           <i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'}`}></i>
         </button>
         
         <button 
           type="submit" 
-          className="send-button"
+          className="send-button mm-blue"
           disabled={!message.trim() && !selectedFile}
           title="Gửi tin nhắn"
+          aria-label="Gửi tin nhắn"
         >
           <i className="fas fa-paper-plane"></i>
         </button>

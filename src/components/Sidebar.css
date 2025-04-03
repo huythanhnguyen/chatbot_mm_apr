@@ -29,6 +29,7 @@
   display: flex;
   flex-direction: column;
   transition: left 0.3s ease;
+  overflow: hidden;
 }
 
 .sidebar.open {
@@ -58,9 +59,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  transition: background-color 0.2s;
 }
 
 .close-sidebar-btn:hover {
+  background-color: #f0f0f0;
   color: #333;
 }
 
@@ -68,6 +74,16 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+  scrollbar-width: thin;
+}
+
+.sidebar-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
 }
 
 .sidebar-section {
@@ -124,6 +140,11 @@
   background-color: #e8f0fe;
 }
 
+.chat-history-item.active {
+  background-color: #e3f2fd;
+  border-left: 3px solid #1976d2;
+}
+
 .chat-history-item i {
   color: #1976d2;
   font-size: 1.2rem;
@@ -160,6 +181,7 @@
   padding: 10px;
   border-radius: 8px;
   background-color: #f5f8fa;
+  position: relative;
 }
 
 .cart-item-image {
@@ -168,6 +190,10 @@
   border-radius: 4px;
   overflow: hidden;
   flex-shrink: 0;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .cart-item-image img {
@@ -181,6 +207,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-right: 24px; /* Space for remove button */
 }
 
 .cart-item-name {
@@ -190,8 +217,6 @@
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
-  line-clamp: 2;
-  line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
 }
@@ -220,10 +245,76 @@
   justify-content: center;
   cursor: pointer;
   font-size: 0.8rem;
+  transition: all 0.2s;
 }
 
-.quantity-btn:hover {
+.quantity-btn:hover:not([disabled]) {
   background-color: #f1f1f1;
+  border-color: #1976d2;
+  color: #1976d2;
+}
+
+.quantity-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.remove-item-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  border: none;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.remove-item-btn:hover {
+  background-color: #f44336;
+  color: white;
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-top: 1px solid #eee;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.total-amount {
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.checkout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+.checkout-btn:hover {
+  background-color: #1565c0;
 }
 
 /* Wishlist */
@@ -239,6 +330,7 @@
   padding: 10px;
   border-radius: 8px;
   background-color: #f5f8fa;
+  position: relative;
 }
 
 .wishlist-item-image {
@@ -247,6 +339,10 @@
   border-radius: 4px;
   overflow: hidden;
   flex-shrink: 0;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .wishlist-item-image img {
@@ -260,6 +356,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-right: 24px; /* Space for remove button */
 }
 
 .wishlist-item-name {
@@ -291,6 +388,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
+  transition: background-color 0.2s;
 }
 
 .add-to-cart-btn:hover {
@@ -333,6 +431,7 @@
   color: #666;
   cursor: pointer;
   position: relative;
+  transition: color 0.2s;
 }
 
 .sidebar-tab i {
@@ -436,6 +535,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  transition: background-color 0.2s;
 }
 
 .login-btn:hover {
@@ -446,5 +546,34 @@
 @media (max-width: 576px) {
   .sidebar {
     width: 280px;
+  }
+  
+  .cart-item-image,
+  .wishlist-item-image {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .cart-item-name,
+  .wishlist-item-name,
+  .cart-item-price,
+  .wishlist-item-price {
+    font-size: 0.8rem;
+  }
+  
+  .quantity-btn {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .add-to-cart-btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .sidebar {
+    width: 260px;
   }
 }
