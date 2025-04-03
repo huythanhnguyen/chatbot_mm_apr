@@ -1,4 +1,4 @@
-// src/components/ChatLayout.jsx
+// Sửa đổi cho ChatLayout.jsx
 import React from 'react';
 import Sidebar from './Sidebar';
 import './ChatLayout.css';
@@ -8,21 +8,26 @@ const ChatLayout = ({
   onNewChat, 
   chatHistory, 
   onSelectChat, 
-  currentChatId, 
+  currentChatId, // Đảm bảo nhận prop này từ component cha
   onLogin, 
   isLoggedIn, 
-  userInfo 
+  userInfo,
+  wishlist = [], // Đổi tên từ wishlistItems nếu cần
 }) => {
   return (
     <div className="chat-layout">
       <Sidebar 
+        isOpen={true} // hoặc truyền một state để kiểm soát
+        onClose={() => {}} // Thêm hàm xử lý đóng sidebar nếu cần
         onNewChat={onNewChat}
         chatHistory={chatHistory}
-        onSelectChat={onSelectChat}
-        currentChatId={currentChatId}
+        onChatSelect={onSelectChat}
+        currentChatId={currentChatId} // Truyền xuống Sidebar
         onLogin={onLogin}
         isLoggedIn={isLoggedIn}
-        userInfo={userInfo}
+        user={userInfo}
+        wishlist={wishlist} // Đảm bảo tên prop đúng
+        cartItems={[]} // Thêm mảng rỗng mặc định nếu không có
       />
       <main className="chat-main">
         {children}
