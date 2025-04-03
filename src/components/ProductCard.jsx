@@ -1,64 +1,151 @@
-// src/components/ProductCard.jsx (corregido)
-import React from 'react';
+import React, { useState } from 'react';
 import './ProductCard.css';
 
-const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
-  const { name, sku, price_range, small_image } = product;
-  
+const ProductCard = ({ 
+  product, 
+  onAddToCart, 
+  onViewDetails, 
+  onToggleWishlist,
+  isInWishlist = false
+}) => {
+  const [quantity, setQuantity] = useState(1);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
+
+  const { 
+    name, 
+    sku, 
+    price_range, 
+    small_image 
+  } = product;
+
+  const handleAddToCart = async (e) => {
+    e.stopPropagation();
+    if (isAddingToCart) return;
+
+    setIsAddingToCart(true);
+    try {
+      await onAddToCart(sku, quantity);
+      setTimeout(() => {
+        setIsAddingToCart(false);
+      }, 1000);
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      setIsAddingToCart(false);
+    }
+  };
+
   const handleViewDetails = () => {
-    if (onViewDetails) onViewDetails(sku);
+    onViewDetails(sku);
   };
-  
-  const handleAddToCart = (e) => {
-    e.stopPropagation(); // Ngăn việc kích hoạt handleViewDetails
-    if (onAddToCart) onAddToCart(sku, 1);
+
+  const handleToggleWishlist = async (e) => {
+    e.stopPropagation();
+    if (isTogglingWishlist) return;
+
+    setIsTogglingWishlist(true);
+    try {
+      await onToggleWishlist(product);
+      setTimeout(() => {
+        setIsTogglingWishlist(false);
+      }, 500);
+    } catch (error) {
+      console.error("Error toggling wishlist:", error);
+      setIsTogglingWishlist(false);
+    }
   };
-  
-  // Format giá
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN').format(price);
+
+  const incrementQuantity = (e) => {
+    e.stopPropagation();
+    if (quantity < 99) {
+      setQuantity(quantity + 1);
+    }
   };
+
+  const decrementQuantity = (e) => {
+    e.stopPropagation();
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+    }
+  };
+
+  // Tính toán giá và khuyến mãi
+  const priceInfo = price_range?.maximum_price;
+  const finalPrice = priceInfo?.final_price;
+  const discount = priceInfo?.discount;
   
-  // Kiểm tra giá một cách an toàn
-  const hasValidPrice = price_range && 
-                       price_range.maximum_price && 
-                       price_range.maximum_price.final_price;
-                       
-  const finalPrice = hasValidPrice ? price_range.maximum_price.final_price : null;
-  const discount = hasValidPrice && price_range.maximum_price.discount ? 
-                   price_range.maximum_price.discount : null;
-  
+  const formattedPrice = finalPrice ? 
+    new Intl.NumberFormat('vi-VN').format(finalPrice.value) + ' ' + finalPrice.currency : 
+    'Liên hệ';
+
   return (
     <div className="product-card" onClick={handleViewDetails}>
+      {/* Badge khuyến mãi */}
       {discount && discount.percent_off > 0 && (
-        <span className="discount-badge">-{Math.round(discount.percent_off)}%</span>
+        <div className="discount-badge">-{discount.percent_off.toFixed(0)}%</div>
       )}
       
+      {/* Nút yêu thích */}
+      <button 
+        className={`wishlist-btn ${isInWishlist ? 'active' : ''}`}
+        onClick={handleToggleWishlist}
+        aria-label={isInWishlist ? "Xóa khỏi yêu thích" : "Thêm vào yêu thích"}
+      >
+        {isTogglingWishlist ? (
+          <i className="fas fa-spinner fa-spin"></i>
+        ) : (
+          <i className={`${isInWishlist ? 'fas' : 'far'} fa-heart`}></i>
+        )}
+      </button>
+      
+      {/* Ảnh sản phẩm */}
       <div className="product-image-container">
         <img 
-          src={small_image?.url || '/placeholder-image.png'} 
+          src={small_image?.url || '/placeholder-product.png'} 
           alt={name} 
           className="product-thumbnail"
-          onError={(e) => {
-            e.target.src = 'https://via.placeholder.com/150x150?text=No+Image';
-          }}
+          onError={(e) => {e.target.src = '/placeholder-product.png'}}
         />
       </div>
       
+      {/* Thông tin sản phẩm */}
       <div className="product-info">
         <h3 className="product-name">{name}</h3>
-        <p className="product-sku">SKU: {sku}</p>
+        <p className="product-sku">Mã: {sku}</p>
+        <p className="product-price">{formattedPrice}</p>
         
-        {finalPrice && (
-          <p className="product-price">{formatPrice(finalPrice.value)} {finalPrice.currency}</p>
-        )}
-        
-        <button 
-          className="add-to-cart-button" 
-          onClick={handleAddToCart}
-        >
-          <i className="fas fa-shopping-cart"></i> Thêm vào giỏ
-        </button>
+        {/* Bộ chọn số lượng và nút thêm vào giỏ */}
+        <div className="product-actions">
+          <div className="quantity-selector">
+            <button 
+              className="quantity-btn" 
+              onClick={decrementQuantity}
+              disabled={quantity <= 1}
+            >
+              -
+            </button>
+            <span className="quantity">{quantity}</span>
+            <button 
+              className="quantity-btn" 
+              onClick={incrementQuantity}
+              disabled={quantity >= 99}
+            >
+              +
+            </button>
+          </div>
+          
+          <button 
+            className="add-to-cart-btn" 
+            onClick={handleAddToCart}
+            disabled={isAddingToCart}
+          >
+            {isAddingToCart ? (
+              <i className="fas fa-spinner fa-spin"></i>
+            ) : (
+              <i className="fas fa-shopping-cart"></i>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

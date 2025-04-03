@@ -1,40 +1,87 @@
-/* src/components/ProductCard.css (đã cập nhật) */
+/* ProductCard.css */
 .product-card {
-  border: 1px solid #e0e0e0;
+  position: relative;
+  width: 100%;
   border-radius: 8px;
   overflow: hidden;
-  width: 180px;
-  flex-shrink: 0;
-  background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  position: relative;
 }
 
 .product-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
 }
 
+/* Ảnh sản phẩm */
 .product-image-container {
+  position: relative;
   width: 100%;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f8f8f8;
+  height: 0;
+  padding-bottom: 100%; /* Tỷ lệ khung hình vuông */
+  background-color: #f5f5f5;
   overflow: hidden;
 }
 
 .product-thumbnail {
-  max-width: 100%;
-  max-height: 100%;
+  position: absolute;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  transition: transform 0.3s ease;
 }
 
+.product-card:hover .product-thumbnail {
+  transform: scale(1.05);
+}
+
+/* Badge giảm giá */
+.discount-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: #f44336;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  z-index: 1;
+}
+
+/* Nút yêu thích */
+.wishlist-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: white;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+  color: #666;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.wishlist-btn:hover {
+  background-color: #f5f5f5;
+}
+
+.wishlist-btn.active {
+  color: #f44336;
+}
+
+/* Thông tin sản phẩm */
 .product-info {
   padding: 12px;
   flex: 1;
@@ -44,59 +91,149 @@
 
 .product-name {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 0.95rem;
   font-weight: 500;
   color: #333;
-  height: 40px;
+  line-height: 1.3;
+  height: 2.6em;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
-.product-price {
-  font-weight: bold;
-  color: #e53935;
-  margin: 4px 0;
-  font-size: 16px;
-}
-
 .product-sku {
-  color: #757575;
-  font-size: 12px;
-  margin: 4px 0;
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: #666;
 }
 
-.add-to-cart-button {
-  background-color: #1976d2;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
+.product-price {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1976d2;
+}
+
+/* Actions: số lượng và nút thêm vào giỏ */
+.product-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: auto;
-  transition: background-color 0.2s;
+}
+
+.quantity-selector {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.quantity-btn {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  background-color: #f5f5f5;
+  border: none;
+  color: #333;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.add-to-cart-button:hover {
+.quantity-btn:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.quantity-btn:disabled {
+  color: #bdbdbd;
+  cursor: not-allowed;
+}
+
+.quantity {
+  flex: 1;
+  text-align: center;
+  font-size: 0.9rem;
+  padding: 0 5px;
+}
+
+.add-to-cart-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.add-to-cart-btn:hover:not(:disabled) {
   background-color: #1565c0;
 }
 
-.discount-badge {
-  position: absolute;
-  top: 5px;
-  left: 5px;
-  background-color: #f44336;
-  color: white;
-  font-size: 11px;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 3px;
-  z-index: 1;
+.add-to-cart-btn:disabled {
+  background-color: #b0bec5;
+  cursor: wait;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .product-name {
+    font-size: 0.9rem;
+  }
+  
+  .product-price {
+    font-size: 1rem;
+  }
+  
+  .quantity-btn {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .add-to-cart-btn {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 576px) {
+  .product-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .product-info {
+    padding: 10px;
+  }
+  
+  .product-actions {
+    gap: 5px;
+  }
+  
+  .quantity-selector {
+    height: 30px;
+  }
+  
+  .quantity-btn {
+    width: 20px;
+    height: 30px;
+  }
+  
+  .add-to-cart-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 0.9rem;
+  }
 }
