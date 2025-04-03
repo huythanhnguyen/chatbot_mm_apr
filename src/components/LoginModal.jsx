@@ -7,63 +7,32 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // Thêm state cho modal login
-const [showLoginModal, setShowLoginModal] = useState(false);
-// Trong LoginModal.jsx, thử thêm tạm thời dòng này:
-try {
-  console.log("Auth service:", authService);
-} catch (e) {
-  console.error("Error with auth service:", e);
-}
-// Hàm xử lý đăng nhập thành công
-const handleLoginSuccess = (token) => {
-  setIsLoggedIn(true);
-  // Gọi API lấy thông tin user
-  fetch('/user-info', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-    .then(res => res.json())
-    .then(data => setUserInfo(data));
-};
 
-// Render thêm LoginModal
-{showLoginModal && (
-  <LoginModal 
-    isOpen={showLoginModal}
-    onClose={() => setShowLoginModal(false)}
-    onLoginSuccess={handleLoginSuccess}
-  />
-)}
   // Nếu modal không mở, không hiển thị
   if (!isOpen) return null;
   
- // Trong hàm handleSubmit
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
-  setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
-  try {
-    const response = await fetch('/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    
-    const result = await response.json();
-    
-    if (result.data?.generateCustomerToken?.token) {
-      localStorage.setItem('authToken', result.data.generateCustomerToken.token);
-      onLoginSuccess(result.data.generateCustomerToken.token);
-      onClose();
-    } else {
-      setError(result.error || 'Đăng nhập thất bại');
+    try {
+      // Sử dụng authService trực tiếp thay vì gọi fetch
+      const result = await authService.login(email, password);
+      
+      if (result.success) {
+        // Gọi callback onLoginSuccess nếu đăng nhập thành công
+        onLoginSuccess(result.token);
+        onClose();
+      } else {
+        setError(result.error || 'Đăng nhập thất bại');
+      }
+    } catch (error) {
+      setError('Lỗi kết nối server');
+      console.error('Login error:', error);
     }
-  } catch (error) {
-    setError('Lỗi kết nối server');
-  }
-  setLoading(false);
-};
+    setLoading(false);
+  };
 
   const handleGuestContinue = () => {
     // Đóng modal và tiếp tục dưới dạng khách
