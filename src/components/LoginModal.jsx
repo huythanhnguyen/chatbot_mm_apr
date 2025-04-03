@@ -9,7 +9,12 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [error, setError] = useState('');
   // Thêm state cho modal login
 const [showLoginModal, setShowLoginModal] = useState(false);
-
+// Trong LoginModal.jsx, thử thêm tạm thời dòng này:
+try {
+  console.log("Auth service:", authService);
+} catch (e) {
+  console.error("Error with auth service:", e);
+}
 // Hàm xử lý đăng nhập thành công
 const handleLoginSuccess = (token) => {
   setIsLoggedIn(true);
